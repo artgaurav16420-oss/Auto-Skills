@@ -1,0 +1,20 @@
+{
+  "name": "auto-skill-select",
+  "version": "1.0.0",
+  "description": "Automatically selects and invokes the best matching skill for any task",
+  "main": "scripts/skill-matcher.js",
+  "bin": {
+    "skill-matcher": "./scripts/skill-matcher.js"
+  },
+  "scripts": {
+    "test": "node --test scripts/skill-matcher.test.js",
+    "test:coverage": "node --experimental-test-coverage --test scripts/skill-matcher.test.js",
+    "start": "node scripts/skill-matcher.js"
+  },
+  "private": true,
+  "keywords": ["skill", "opencode", "skill-matcher", "auto-select"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
