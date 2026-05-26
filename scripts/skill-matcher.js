@@ -541,7 +541,13 @@ function main() {
 
   if (args[0] === '--multi' || args[0] === '-m') {
     const thresholdIdx = args.indexOf('--threshold') !== -1 ? args.indexOf('--threshold') : args.indexOf('-t');
-    const threshold = thresholdIdx !== -1 ? parseInt(args[thresholdIdx + 1], 10) : 70;
+    let threshold = 70;
+    if (thresholdIdx !== -1 && thresholdIdx + 1 < args.length) {
+      const parsed = parseInt(args[thresholdIdx + 1], 10);
+      if (!isNaN(parsed)) {
+        threshold = parsed;
+      }
+    }
     const nonFlagArgs = args.filter((a, i) => {
       if (a === '--multi' || a === '-m') return false;
       if (a === '--threshold' || a === '-t') return false;
