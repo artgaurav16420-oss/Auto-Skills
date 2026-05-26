@@ -23,8 +23,9 @@ const DOMAIN_KEYWORDS = new Set([
   'config', 'database', 'network', 'security', 'mobile', 'cli', 'api'
 ]);
 const ACTION_KEYWORDS = new Set([
-  'create', 'fix', 'migrate', 'refactor', 'debug', 'optimize', 'test',
-  'deploy', 'build', 'add', 'remove', 'update', 'rename', 'configure'
+  'create', 'fix', 'migrate', 'refactor', 'debug', 'optimize', 'test', 'tests',
+  'deploy', 'build', 'add', 'remove', 'update', 'rename', 'configure',
+  'write', 'implement', 'make', 'setup'
 ]);
 const TECH_KEYWORDS = new Set([
   'react', 'typescript', 'python', 'docker', 'supabase', 'node',
@@ -106,7 +107,8 @@ function computeKeywordScore(taskIntent, skillTokens) {
  * @returns {number} score 0-60
  */
 function computeTokenOverlapScore(taskTokens, skillStr) {
-  const skillWords = new Set(skillStr.toLowerCase().split(/\s+/));
+  const cleaned = skillStr.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ');
+  const skillWords = new Set(cleaned.split(/\s+/).filter(Boolean));
   const matchCount = taskTokens.filter(t => skillWords.has(t)).length;
   return Math.min(SEMANTIC_SCORE_MAX, (matchCount / Math.max(taskTokens.length, 1)) * SEMANTIC_SCORE_MAX);
 }
@@ -155,6 +157,14 @@ function isValidSkillsArray(data) {
   return Array.isArray(data) && data.every(s => s && s.name && typeof s.description === 'string');
 }
 
+function extractSkillsFromData(data) {
+  if (isValidSkillsArray(data)) return data;
+  if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(data.skills)) {
+    if (isValidSkillsArray(data.skills)) return data.skills;
+  }
+  return null;
+}
+
 function isPathAllowed(targetPath) {
   const resolved = fs.realpathSync(targetPath);
   const relative = path.relative(SECURE_BASE_DIR, resolved);
@@ -179,9 +189,8 @@ function loadSkills(customPath) {
         return [];
       }
       const data = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
-      if (isValidSkillsArray(data)) {
-        return data;
-      }
+      const extracted = extractSkillsFromData(data);
+      if (extracted) return extracted;
       console.warn(`loadSkills: invalid skills array in ${customPath}`);
       return [];
     } catch (err) {
@@ -228,21 +237,37 @@ function parseSkillFrontmatter(content) {
  * @param {string[]} [dirs] — directories to scan (default: common skill locations)
  * @returns {Array<{name: string, description: string}>}
  */
+function walkForSubdir(root, target) {
+  const results = [];
+  try {
+    const entries = fs.readdirSync(root, { withFileTypes: true });
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const full = path.join(root, e.name);
+      const candidate = path.join(full, target);
+      if (fs.existsSync(candidate)) {
+        results.push(candidate);
+      } else {
+        results.push(...walkForSubdir(full, target));
+      }
+    }
+  } catch {}
+  return results;
+}
+
 function getDefaultScanDirs() {
   const dirs = [
     path.join(os.homedir(), '.agents', 'skills'),
     path.join(os.homedir(), '.config', 'opencode', 'skills'),
     path.join(os.homedir(), '.claude', 'skills')
   ];
+  const userAgentsSkills = path.join(os.homedir(), '.agents', 'skills');
+  const eccSkills = path.join(userAgentsSkills, 'ecc', 'skills');
+  if (fs.existsSync(eccSkills)) dirs.push(eccSkills);
   const cacheBase = path.join(os.homedir(), '.cache', 'opencode', 'packages');
   try {
-    const pkgDirs = fs.readdirSync(cacheBase, { withFileTypes: true });
-    for (const d of pkgDirs) {
-      if (d.isDirectory()) {
-        const skillsPath = path.join(cacheBase, d.name, 'node_modules', 'superpowers', 'skills');
-        if (fs.existsSync(skillsPath)) dirs.push(skillsPath);
-      }
-    }
+    const found = walkForSubdir(cacheBase, path.join('node_modules', 'superpowers', 'skills'));
+    dirs.push(...found);
   } catch {}
   return dirs;
 }
@@ -441,7 +466,7 @@ function printScore(taskText, customPath) {
 
 const AGENTS_MD_HOOK = `## Global Session Start
 
-ALWAYS invoke the \`auto-skill-select\` skill at the very start of every session (before any other action or clarifying question), AND re-invoke it before EVERY new task mid-session. Do not skip re-invocation — even if you remember the previous match. Task context changes; the skill match should too.
+ALWAYS invoke the \`auto-skill-select\` skill at the very start of every session (before any other action or clarifying question), AND re-invoke it before EVERY new task mid-session. Do not skip re-invocation — even if you remember the previous match. Task context changes; the skill match should too. The task layer loads one or more skills depending on score: single if >90, multi if 70-90.
 
 You MUST follow Karpathy Guidelines (loaded via instructions) for every response: think before coding, simplicity first, surgical changes, goal-driven execution.
 `;
@@ -473,6 +498,22 @@ function setupAgentsMd(agentsPath) {
   return { status: 'appended', path: target };
 }
 
+function printMultiScore(taskText, customPath, threshold) {
+  const skills = loadSkills(customPath);
+  if (skills.length === 0) {
+    console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
+    return false;
+  }
+  const results = score(skills, taskText);
+  const filtered = results.filter(r => r.score >= threshold);
+  if (filtered.length === 0) {
+    console.log(JSON.stringify({ threshold, count: 0, message: `No skills scored >= ${threshold}`, results }, null, 2));
+    return true;
+  }
+  console.log(JSON.stringify({ threshold, count: filtered.length, results: filtered }, null, 2));
+  return true;
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -494,6 +535,25 @@ function main() {
       printScore(input.trim());
       rl.close();
     });
+    return;
+  }
+
+  if (args[0] === '--multi' || args[0] === '-m') {
+    const thresholdIdx = args.indexOf('--threshold') !== -1 ? args.indexOf('--threshold') : args.indexOf('-t');
+    const threshold = thresholdIdx !== -1 ? parseInt(args[thresholdIdx + 1], 10) : 70;
+    const nonFlagArgs = args.filter((a, i) => {
+      if (a === '--multi' || a === '-m') return false;
+      if (a === '--threshold' || a === '-t') return false;
+      if (thresholdIdx !== -1 && (i === thresholdIdx + 1)) return false;
+      return true;
+    });
+    const taskText = nonFlagArgs[0];
+    const indexPath = nonFlagArgs[1];
+    if (!taskText) {
+      console.log(JSON.stringify({ error: 'Task text required after --multi' }));
+      return;
+    }
+    printMultiScore(taskText, indexPath, threshold);
     return;
   }
 
