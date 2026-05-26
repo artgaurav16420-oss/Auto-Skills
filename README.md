@@ -32,6 +32,7 @@ Built for developers who want their AI tools to be **proactive**, not reactive.
 | 🔌 | **Multi-Platform** — OpenCode, Claude Code, Gemini CLI | One setup, works everywhere |
 | 🧪 | **Deterministic CLI** — offline pre-scoring tool | Test and debug skill matching without an LLM |
 | 🛡️ | **Secure by Default** — path traversal protection, no telemetry, no network calls | Your code never leaves your machine |
+| 🔍 | **Auto-Discovery** — `--scan` finds every installed skill | Score your entire skillset with one command |
 | 📦 | **Self-Contained** — 8 files, ~660 LOC | Fully auditable in an afternoon |
 
 ---
@@ -42,8 +43,8 @@ Built for developers who want their AI tools to be **proactive**, not reactive.
 # Clone the skill to your agents directory
 git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/auto-skill-select
 
-# Test it works
-node scripts/skill-matcher.js "debug the login bug"
+# Auto-scan all installed skills and find the best match
+node scripts/skill-matcher.js --scan "debug the login bug"
 
 # Run the test suite
 npm test
@@ -87,6 +88,21 @@ The **40/60 split** ensures exact keyword hits don't override broader contextual
 ## 🖥️ CLI Usage
 
 The companion `scripts/skill-matcher.js` CLI lets you test scoring offline, inspect scores, and debug your skill configurations.
+
+### Scan Mode — Auto-Discover All Installed Skills
+
+```bash
+# Scan default skill locations, score against task
+node scripts/skill-matcher.js --scan "debug the login bug"
+
+# Scan a specific directory tree
+node scripts/skill-matcher.js --scan "build react frontend" ~/.agents/skills
+
+# Interactive scan (no task arg = prompts you)
+node scripts/skill-matcher.js --scan
+```
+
+Scans `~/.agents/skills/`, `~/.config/opencode/skills/`, and `~/.claude/skills/` for `SKILL.md` files, parses their YAML frontmatter, and scores every discovered skill against your task. Shows the best match and a full ranked list.
 
 ### Interactive Mode
 
@@ -203,6 +219,24 @@ Loads skill definitions from a JSON file path, `SKILLS_JSON` environment variabl
 loadSkills('./skills.json')          // → [{name, description}, ...]
 // or set process.env.SKILLS_JSON
 loadSkills()                         // → loads from env or returns []
+```
+
+### `parseSkillFrontmatter(content)`
+
+Parses YAML frontmatter (`---` blocks) from a `SKILL.md` file.
+
+```js
+parseSkillFrontmatter('---\nname: diagnose\ndescription: Debugging tool\n---')
+// → { name: 'diagnose', description: 'Debugging tool' }
+```
+
+### `discoverSkills(dirs?)`
+
+Scans directories for `SKILL.md` files and extracts skill definitions. Scans `~/.agents/skills/`, `~/.config/opencode/skills/`, and `~/.claude/skills/` by default.
+
+```js
+discoverSkills()                     // → [{name, description}, ...]
+discoverSkills(['./custom/skills'])  // → scan specific directories only
 ```
 
 ---

@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const readline = require('readline');
 
 // MIT License - Copyright (c) 2026 - see LICENSE file
@@ -206,6 +207,85 @@ function loadSkills(customPath) {
   return [];
 }
 
+/**
+ * Parse YAML frontmatter from a SKILL.md file.
+ * @param {string} content — raw file content
+ * @returns {{ name: string, description: string } | null}
+ */
+function parseSkillFrontmatter(content) {
+  if (!content || typeof content !== 'string') return null;
+  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!match) return null;
+  const yaml = match[1];
+  const name = yaml.match(/^name:\s*(.+)$/m);
+  const description = yaml.match(/^description:\s*(.+)$/m);
+  if (!name || !description) return null;
+  return { name: name[1].trim(), description: description[1].trim() };
+}
+
+/**
+ * Discover skills by scanning directories for SKILL.md files.
+ * @param {string[]} [dirs] — directories to scan (default: common skill locations)
+ * @returns {Array<{name: string, description: string}>}
+ */
+function discoverSkills(dirs) {
+  const defaultDirs = [
+    path.join(os.homedir(), '.agents', 'skills'),
+    path.join(os.homedir(), '.config', 'opencode', 'skills'),
+    path.join(os.homedir(), '.claude', 'skills')
+  ];
+  const searchDirs = Array.isArray(dirs) && dirs.length > 0 ? dirs : defaultDirs;
+  const seen = new Set();
+  const skills = [];
+
+  for (const dir of searchDirs) {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const skillPath = path.join(dir, entry.name, 'SKILL.md');
+      let content;
+      try {
+        content = fs.readFileSync(skillPath, 'utf8');
+      } catch {
+        continue;
+      }
+      const parsed = parseSkillFrontmatter(content);
+      if (parsed && !seen.has(parsed.name)) {
+        seen.add(parsed.name);
+        skills.push(parsed);
+      }
+    }
+  }
+  return skills;
+}
+
+/**
+ * Score a task against all discovered skills and print results.
+ * @param {string} taskText
+ * @param {string[]} [scanDirs]
+ * @returns {boolean}
+ */
+function scanAndScore(taskText, scanDirs) {
+  const skills = discoverSkills(scanDirs);
+  if (skills.length === 0) {
+    console.log('No skills discovered in any skill directory.');
+    return false;
+  }
+  const results = score(skills, taskText);
+  if (results.length === 0) {
+    console.log('No skills matched.');
+    return false;
+  }
+  console.log(`Scanned ${skills.length} skills. Best match: ${results[0].name} (${results[0].score}/100)`);
+  console.log(JSON.stringify(results, null, 2));
+  return true;
+}
+
 function printScore(taskText, customPath) {
   const skills = loadSkills(customPath);
   if (skills.length === 0) {
@@ -241,8 +321,35 @@ function main() {
     return;
   }
 
+  if (args[0] === '--scan' || args[0] === '-s') {
+    const taskText = args[1];
+    const scanDirs = args[2] ? [args[2]] : undefined;
+    if (!taskText) {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+      rl.on('error', () => {
+        rl.close();
+        process.exit(1);
+      });
+      rl.question('Describe the task: ', input => {
+        if (!input || !input.trim()) {
+          console.log('No task entered. Exiting.');
+          rl.close();
+          return;
+        }
+        scanAndScore(input.trim(), scanDirs);
+        rl.close();
+      });
+      return;
+    }
+    scanAndScore(taskText, scanDirs);
+    return;
+  }
+
   printScore(args[0], args[1]);
 }
 
 if (require.main === module) main();
-module.exports = { score, tokenize, loadSkills, extractIntent };
+module.exports = { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills };

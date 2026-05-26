@@ -4,7 +4,7 @@ const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
-const { score, tokenize, loadSkills, extractIntent } = require('./skill-matcher');
+const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills } = require('./skill-matcher');
 
 describe('tokenize', () => {
   it('splits text into normalized tokens', () => {
@@ -201,6 +201,107 @@ describe('loadSkills', () => {
   });
 });
 
+describe('parseSkillFrontmatter', () => {
+  it('parses name and description from valid frontmatter', () => {
+    const content = `---
+name: test-skill
+description: A skill for testing things
+---`;
+    const result = parseSkillFrontmatter(content);
+    assert.deepStrictEqual(result, { name: 'test-skill', description: 'A skill for testing things' });
+  });
+
+  it('returns null for content without frontmatter', () => {
+    assert.strictEqual(parseSkillFrontmatter('# Just a heading'), null);
+  });
+
+  it('returns null for empty string', () => {
+    assert.strictEqual(parseSkillFrontmatter(''), null);
+  });
+
+  it('returns null for null input', () => {
+    assert.strictEqual(parseSkillFrontmatter(null), null);
+  });
+
+  it('returns null for non-string input', () => {
+    assert.strictEqual(parseSkillFrontmatter(42), null);
+  });
+
+  it('handles multiline descriptions', () => {
+    const content = `---
+name: multiline-skill
+description: >
+  A skill with
+  a wrapped description
+---`;
+    const result = parseSkillFrontmatter(content);
+    assert.ok(result);
+    assert.strictEqual(result.name, 'multiline-skill');
+    assert.ok(result.description.length > 0);
+  });
+
+  it('parses real-world SKILL.md format', () => {
+    const content = `---
+name: auto-skill-select
+description: Automatically selects and invokes the best matching skill for any given task using hybrid keyword + semantic analysis. Scans all installed skills from context and auto-invokes the top match. Use when starting any task to ensure no relevant skill is missed, or when uncertain which skill applies.
+---`;
+    const result = parseSkillFrontmatter(content);
+    assert.ok(result);
+    assert.strictEqual(result.name, 'auto-skill-select');
+    assert.ok(result.description.includes('hybrid keyword'));
+  });
+});
+
+describe('discoverSkills', () => {
+  const tmpDir = path.join(__dirname, '..', '.code-review-cache', 'test-skills-scan');
+
+  beforeEach(() => {
+    fs.mkdirSync(path.join(tmpDir, 'skill-a'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'skill-b'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'empty-dir'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'skill-a', 'SKILL.md'), `---
+name: skill-a
+description: The first test skill
+---`);
+    fs.writeFileSync(path.join(tmpDir, 'skill-b', 'SKILL.md'), `---
+name: skill-b
+description: The second test skill for debugging
+---`);
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  });
+
+  it('discovers skills from specified directories', () => {
+    const skills = discoverSkills([tmpDir]);
+    assert.strictEqual(skills.length, 2);
+    assert.ok(skills.some(s => s.name === 'skill-a'));
+    assert.ok(skills.some(s => s.name === 'skill-b'));
+  });
+
+  it('deduplicates skills with the same name', () => {
+    fs.mkdirSync(path.join(tmpDir, 'skill-a-dup'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'skill-a-dup', 'SKILL.md'), `---
+name: skill-a
+description: Duplicate of skill-a
+---`);
+    const skills = discoverSkills([tmpDir]);
+    const skillACount = skills.filter(s => s.name === 'skill-a').length;
+    assert.strictEqual(skillACount, 1);
+  });
+
+  it('skips directories without SKILL.md', () => {
+    const skills = discoverSkills([tmpDir]);
+    assert.ok(!skills.some(s => s.name === 'empty-dir'));
+  });
+
+  it('returns empty array for non-existent directory', () => {
+    const skills = discoverSkills([path.join(tmpDir, 'non-existent')]);
+    assert.deepStrictEqual(skills, []);
+  });
+});
+
 describe('main (CLI entry point)', () => {
   const testSkillsPath = path.join(__dirname, '..', '.code-review-cache', 'test-skills.json');
 
@@ -225,5 +326,24 @@ describe('main (CLI entry point)', () => {
     assert.ok(parsed.length > 0);
     assert.ok(parsed[0].name);
     assert.ok(typeof parsed[0].score === 'number');
+  });
+
+  it('prints ranked results with --scan flag', () => {
+    const scanDir = path.join(__dirname, '..', '.code-review-cache', 'scan-integration');
+    fs.mkdirSync(path.join(scanDir, 'test-skill'), { recursive: true });
+    fs.writeFileSync(path.join(scanDir, 'test-skill', 'SKILL.md'), `---
+name: test-skill
+description: A skill for debugging code
+---`);
+    try {
+      const result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --scan "debug the build" "${scanDir}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      assert.ok(result.includes('test-skill'));
+      assert.ok(result.includes('score'));
+    } finally {
+      try { fs.rmSync(scanDir, { recursive: true, force: true }); } catch {}
+    }
   });
 });
