@@ -1,10 +1,13 @@
-import type { Plugin } from "@opencode-ai/plugin"
 import { readFileSync, existsSync } from "fs"
-import { join } from "path"
+import { join, dirname } from "path"
 import { homedir } from "os"
+import { fileURLToPath } from "url"
+import { createRequire } from "module"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const _require = createRequire(import.meta.url)
 
 let injected = false
-let systemStripped = false
 
 const BASE_SKILLS = new Set(["caveman", "karpathy-guidelines", "auto-skill-select", "superpowers"])
 const SKILLS_DIR = join(homedir(), ".agents/skills/auto-skill-select")
@@ -15,85 +18,89 @@ const AVAILABLE_SKILLS_REPLACEMENT =
   "Skills are auto-matched by the auto-skill-select plugin and injected into context. " +
   "You can still load additional skills manually via the skill tool."
 
-export default (async () => {
+function stripAvailableSkillsFromMessage(msg) {
+  if (msg.info?.role !== "system" || !msg.parts?.length) return false
+  let modified = false
+  for (let i = 0; i < msg.parts.length; i++) {
+    const p = msg.parts[i]
+    if (p.type === "text" && p.text.includes("<available_skills>")) {
+      p.text = p.text.replace(
+        /<available_skills>[\s\S]*?<\/available_skills>/g,
+        AVAILABLE_SKILLS_REPLACEMENT
+      )
+      modified = true
+    }
+  }
+  return modified
+}
+
+export const AutoSkillHook = async ({ client }) => {
   return {
-    "experimental.chat.system.transform": (system: string | any[]) => {
-      if (systemStripped) return system
-      systemStripped = true
+    "experimental.chat.messages.transform": async (_input, output) => {
+      if (!output?.messages?.length) return
 
-      if (typeof system === "string") {
-        const start = system.indexOf("<available_skills>")
-        const end = system.indexOf("</available_skills>")
-        if (start !== -1 && end !== -1) {
-          return (
-            system.slice(0, start) +
-            AVAILABLE_SKILLS_REPLACEMENT +
-            system.slice(end + "</available_skills>".length)
-          )
-        }
-        return system
+      // 1. Strip <available_skills> from every system message (every turn)
+      let strippedAny = false
+      for (const msg of output.messages) {
+        if (stripAvailableSkillsFromMessage(msg)) strippedAny = true
       }
-
-      if (Array.isArray(system)) {
-        return system.map((msg) => {
-          if (typeof msg.content === "string" && msg.content.includes("<available_skills>")) {
-            const start = msg.content.indexOf("<available_skills>")
-            const end = msg.content.indexOf("</available_skills>")
-            if (start !== -1 && end !== -1) {
-              return {
-                ...msg,
-                content:
-                  msg.content.slice(0, start) +
-                  AVAILABLE_SKILLS_REPLACEMENT +
-                  msg.content.slice(end + "</available_skills>".length),
-              }
-            }
-          }
-          return msg
+      if (strippedAny && client?.app?.log) {
+        await client.app.log({
+          body: { service: "auto-skill-hook", level: "info", message: "Stripped <available_skills> from system prompt" }
         })
       }
 
-      return system
-    },
-
-    "experimental.chat.messages.transform": (messages: any[]) => {
-      if (injected) return messages
+      // 2. Auto-load matched skills (one shot, on first user message)
+      if (injected) return
       injected = true
 
-      if (!existsSync(SKILLS_INDEX) || !existsSync(SKILL_MATCHER)) return messages
+      if (!existsSync(SKILLS_INDEX) || !existsSync(SKILL_MATCHER)) return
 
       try {
-        const firstUser = messages.find(
-          (m: any) => m.role === "user" && typeof m.content === "string" && m.content.trim()
+        const firstUser = output.messages.find(
+          (m) => m.info?.role === "user" && m.parts?.length
         )
-        if (!firstUser) return messages
+        if (!firstUser) return
 
-        const { loadSkills, score } = require(SKILL_MATCHER)
+        const userText = firstUser.parts.find((p) => p.type === "text")?.text?.trim()
+        if (!userText) return
+
+        const { loadSkills, score } = _require(SKILL_MATCHER)
         const allSkills = loadSkills(SKILLS_INDEX)
-        if (!allSkills.length) return messages
+        if (!allSkills?.length) return
 
-        const results = score(allSkills, firstUser.content)
+        const results = score(allSkills, userText)
         const matched = results.filter(
-          (r: any) => r.score >= 70 && !BASE_SKILLS.has(r.name)
+          (r) => r.score >= 70 && !BASE_SKILLS.has(r.name)
         )
-        if (!matched.length) return messages
+        if (!matched.length) return
 
-        const skillMessages: any[] = []
+        const skillMessages = []
         for (const m of matched) {
-          const skill = allSkills.find((s: any) => s.name === m.name)
+          const skill = allSkills.find((s) => s.name === m.name)
           if (!skill?.path || !existsSync(skill.path)) continue
           const content = readFileSync(skill.path, "utf8")
           skillMessages.push({
-            role: "system",
-            content: `[auto-loaded skill: ${m.name} (score: ${m.score}/100)]\n\n${content}`,
+            info: { role: "system" },
+            parts: [{ type: "text", text: `[auto-loaded skill: ${m.name} (score: ${m.score}/100)]\n\n${content}` }]
           })
         }
 
-        if (!skillMessages.length) return messages
-        return [...skillMessages, ...messages]
-      } catch {
-        return messages
+        if (!skillMessages.length) return
+        output.messages.unshift(...skillMessages)
+
+        if (client?.app?.log) {
+          await client.app.log({
+            body: { service: "auto-skill-hook", level: "info", message: `Auto-loaded ${skillMessages.length} skill(s): ${matched.map(m => m.name).join(", ")}` }
+          })
+        }
+      } catch (err) {
+        if (client?.app?.log) {
+          await client.app.log({
+            body: { service: "auto-skill-hook", level: "error", message: `Skill injection failed: ${err.message}`, extra: { stack: err.stack } }
+          })
+        }
       }
-    },
+    }
   }
-}) satisfies Plugin
+}
