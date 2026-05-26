@@ -243,6 +243,7 @@ function walkForSubdir(root, target) {
     const entries = fs.readdirSync(root, { withFileTypes: true });
     for (const e of entries) {
       if (!e.isDirectory()) continue;
+      if (e.name === 'node_modules' || e.name === '.git') continue;
       const full = path.join(root, e.name);
       const candidate = path.join(full, target);
       if (fs.existsSync(candidate)) {
