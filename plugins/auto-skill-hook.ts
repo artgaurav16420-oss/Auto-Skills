@@ -1,11 +1,7 @@
 import { readFileSync, existsSync } from "fs"
-import { join, dirname } from "path"
+import { join } from "path"
 import { homedir } from "os"
-import { fileURLToPath } from "url"
-import { createRequire } from "module"
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const _require = createRequire(import.meta.url)
+import { pathToFileURL } from "url"
 
 let injected = false
 
@@ -41,14 +37,12 @@ export const AutoSkillHook = async ({ client }) => {
     "experimental.chat.messages.transform": async (_input, output) => {
       if (!output?.messages?.length) return
 
-      // Strip <available_skills> from every system message
       for (const msg of output.messages) {
         if (msg.info?.role === "system" && msg.parts?.length) {
           stripParts(msg.parts)
         }
       }
 
-      // Auto-load matched skills (one shot)
       if (injected) return
       injected = true
 
@@ -62,7 +56,7 @@ export const AutoSkillHook = async ({ client }) => {
         const userText = firstUser.parts.find((p) => p.type === "text")?.text?.trim()
         if (!userText) return
 
-        const { loadSkills, score } = _require(SKILL_MATCHER)
+        const { loadSkills, score } = await import(pathToFileURL(SKILL_MATCHER).href)
         const allSkills = loadSkills(SKILLS_INDEX)
         if (!allSkills?.length) return
 
