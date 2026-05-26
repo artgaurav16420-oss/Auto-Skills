@@ -103,10 +103,7 @@ If the index is enriched with project context, boost scores for skills whose des
 
 | Score | Action |
 |-------|--------|
-| > 90 | **Single auto-invoke**. One skill dominates — load it alone. Read its SKILL.md, follow its instructions. Announce: "Using [skill] for [purpose]" |
-| 70-90 | **Multi auto-invoke**. Load ALL skills in this range. Read each SKILL.md, merge their guidance contextually. Announce: "Using [skills] for [purpose]" listing each one |
-| 40-70 | **Prompt user**: "These skills might help: [top 2-3]. Which should I use?" |
-| < 40 | **No match → suggest install**. Reason from task intent what skill would help. Name it, describe what it does, and explain why it fits. Ask if they want to find or create it. Then proceed with base layer only. |
+| > 90 | **Single auto-invoke**. One skill dominates — load it alone. Read its SKILL.md, follow its instructions. Announce: \"Using [skill] for [purpose]\" |\n| 70-90 | **Multi auto-invoke**. Load ALL skills in this range. Read each SKILL.md, merge their guidance contextually. Announce: \"Using [skills] for [purpose]\" listing each one |\n| 40-69 | **Prompt user**: \"These skills might help: [top 2-3]. Which should I use?\" |\n| < 40 | **No match → suggest install**. Reason from task intent what skill would help. Name it, describe what it does, and explain why it fits. Ask if they want to find or create it. Then proceed with base layer only. |
 
 **Multi-skill merging rule:** When loading multiple skills, apply their guidance as complementary layers. If they conflict, the higher-scored skill's guidance takes precedence. Do not load skills whose guidance is a subset of another loaded skill (e.g., TDD and test-driven-development).
 
