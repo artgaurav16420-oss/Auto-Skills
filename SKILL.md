@@ -7,7 +7,7 @@ description: Automatically selects and invokes the best matching skill for any g
 
 ## Overview
 
-Three skills are **always loaded** on every task (base layer), then a task-specific skill is selected on top.
+Three skills are **always loaded** on every task (base layer), then one or more task-specific skills are loaded on top.
 
 This workflow re-runs on **every task change** — not just session start. When the user pivots (e.g., "debug login" → "build dashboard"), re-evaluate the task-layer match. The base layer loads once per session; the task layer re-scores each time.
 
@@ -19,7 +19,7 @@ This workflow re-runs on **every task change** — not just session start. When 
 | **Superpowers** | Skill-invocation discipline — always check skills before acting | Already in system prompt |
 
 **Task layer (matched per-request):**
-All other skills from `.skills-index.json` scored against the user's task.
+All other skills from `.skills-index.json` scored against the user's task. Multiple skills can be loaded if they all score highly on different dimensions of the same task.
 
 ## Workflow
 
@@ -103,13 +103,20 @@ If the index is enriched with project context, boost scores for skills whose des
 
 | Score | Action |
 |-------|--------|
-| > 70 | **Auto-invoke**. Read the winning skill's SKILL.md from its `path`. Call the `skill` tool. Announce: "Using [skill] for [purpose]" |
-| 40-70 | **Prompt user**: "These skills might help: [top 2-3]. Which should I use?" |
-| < 40 | **No match → suggest install**. Reason from task intent what skill would help. Name it, describe what it does, and explain why it fits. Ask if they want to find or create it. Then proceed with base layer only. |
+| > 90 | **Single auto-invoke**. One skill dominates — load it alone. Read its SKILL.md, follow its instructions. Announce: \"Using [skill] for [purpose]\" |\n| 70-90 | **Multi auto-invoke**. Load ALL skills in this range. Read each SKILL.md, merge their guidance contextually. Announce: \"Using [skills] for [purpose]\" listing each one |\n| 40-69 | **Prompt user**: \"These skills might help: [top 2-3]. Which should I use?\" |\n| < 40 | **No match → suggest install**. Reason from task intent what skill would help. Name it, describe what it does, and explain why it fits. Ask if they want to find or create it. Then proceed with base layer only. |
 
-### 6. Load the matched skill
+**Multi-skill merging rule:** When loading multiple skills, apply their guidance as complementary layers. If they conflict, the higher-scored skill's guidance takes precedence. Do not load skills whose guidance is a subset of another loaded skill (e.g., TDD and test-driven-development).
 
-For the winning skill (or the user's pick), `Read` the file at the `path` stored in the index, then follow that skill's workflow instructions for the task.
+### 6. Load the matched skill(s)
+
+For the winning skill(s), `Read` the file at the `path` stored in the index, then follow that skill's workflow instructions for the task.
+
+When loading multiple skills:
+1. Deduplicate — skip skills that are functional aliases (e.g., `tdd` and `test-driven-development`; pick the higher-scored one)
+2. Sort descending by score
+3. Read each SKILL.md
+4. Announce all loaded skills with their scores
+5. Apply guidance composably — non-overlapping sections from each skill are additive; overlapping sections use the highest-scored skill's version
 
 ## Design Rationale
 
@@ -146,6 +153,12 @@ node scripts/skill-matcher.js --index
 
 # Build enriched index with project context detection (reads package.json, etc.)
 node scripts/skill-matcher.js --enrich
+
+# Multi-skill mode: return all skills above threshold (default: 70)
+node scripts/skill-matcher.js --multi "build a react dashboard" ./skills-index.json
+
+# Multi-skill mode with custom threshold
+node scripts/skill-matcher.js --multi --threshold 60 "debug login flow" ./skills-index.json
 ```
 
 ## Rules
@@ -154,8 +167,7 @@ node scripts/skill-matcher.js --enrich
 - **Re-run on every task change.** Detect task switches by parsing user messages — new domain, action, or technology signals a shift. On task change, skip step 0 (index still valid) and step 1 (base layer still loaded); re-run from step 2.
 - On session start, run full workflow (steps 0-6). On mid-session task switch, run steps 2-6 only.
 - Always load Caveman + Karpathy Guidelines + Superpowers first — they are non-negotiable on every task.
-- After base layer, find the best task-specific skill and load it on top.
-- If multiple task-specific skills score > 70, invoke the highest. Mention the runner-up.
+- After base layer, find all task-specific skills scoring >=70 and load the top results (multi if all are 70-90, single if the highest is >90).\n- If the highest-scoring skill is >90, load only that single skill. If no skill is >90 but multiple skills score 70-90, load all of them (deduplicating aliases).
 - If a skill was already loaded, don't reload. Just apply its rules.
 - Never skip this workflow because you "know what the task is." Surface assumptions first.
 - If `.skills-index.json` is missing or stale, ask the user to run `--index` to regenerate it.
