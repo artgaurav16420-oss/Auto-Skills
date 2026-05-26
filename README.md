@@ -4,7 +4,7 @@
 </picture>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-30%2F30-brightgreen?style=flat-square&logo=vitest" alt="Tests">
+   <img src="https://img.shields.io/badge/tests-46%2F46-brightgreen?style=flat-square&logo=vitest" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js" alt="Node">
   <img src="https://img.shields.io/badge/dependencies-0-success?style=flat-square" alt="Dependencies">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
@@ -33,6 +33,7 @@ Built for developers who want their AI tools to be **proactive**, not reactive.
 | 🧪 | **Deterministic CLI** — offline pre-scoring tool | Test and debug skill matching without an LLM |
 | 🛡️ | **Secure by Default** — path traversal protection, no telemetry, no network calls | Your code never leaves your machine |
 | 🔍 | **Auto-Discovery** — `--scan` finds every installed skill | Score your entire skillset with one command |
+| 🏷️ | **Index Mode** — `--index` builds a lightweight skills index | Reduce LLM prompt overhead by ~85% |
 | 📦 | **Self-Contained** — 8 files, ~660 LOC | Fully auditable in an afternoon |
 
 ---
@@ -103,6 +104,21 @@ node scripts/skill-matcher.js --scan
 ```
 
 Scans `~/.agents/skills/`, `~/.config/opencode/skills/`, and `~/.claude/skills/` for `SKILL.md` files, parses their YAML frontmatter, and scores every discovered skill against your task. Shows the best match and a full ranked list.
+
+### Index Mode — Build Skills Index for LLM Workflow
+
+```bash
+# Build index to default output (prints to stdout)
+node scripts/skill-matcher.js --index
+
+# Build index to a specific file
+node scripts/skill-matcher.js --index ./path/to/.skills-index.json
+
+# Build index from a specific directory tree
+node scripts/skill-matcher.js --index ./output.json ~/.agents/skills
+```
+
+Scans all installed skill directories for `SKILL.md` files, parses their YAML frontmatter, and writes a compact JSON file with `name`, `description`, and `path` for each skill (~5KB for 50 skills vs ~50KB of full SKILL.md content — **85% context reduction**). The LLM workflow reads this index instead of the system prompt.
 
 ### Interactive Mode
 
@@ -179,7 +195,7 @@ The skill auto-activates via `activate_skill` in the session lifecycle.
 
 ## 📚 API Reference
 
-All exported functions have JSDoc annotations and are fully tested (30 tests, all passing).
+All exported functions have JSDoc annotations and are fully tested (46 tests, all passing).
 
 ### `score(skills, taskText)`
 
@@ -253,7 +269,7 @@ We ❤️ pull requests.
 ```bash
 git clone https://github.com/artgaurav16420-oss/Auto-Skills.git
 cd auto-skill-select
-npm test                              # 30 tests, all green
+npm test                              # 46 tests, all green
 node scripts/skill-matcher.js "..."   # manual smoke test
 ```
 
@@ -267,7 +283,7 @@ auto-skill-select/
 ├── assets/banner.svg             # README banner
 ├── scripts/
 │   ├── skill-matcher.js         # CLI + library (248 LOC)
-│   └── skill-matcher.test.js    # 30 tests
+│   └── skill-matcher.test.js    # 46 tests
 ├── SKILL.md                     # Agent workflow instructions
 ├── README.md                    # You are here
 ├── CHANGELOG.md                 # v1.0.0
@@ -281,7 +297,7 @@ auto-skill-select/
   <br/>
   <strong>OpenCode</strong> · <strong>Claude Code</strong> · <strong>Gemini CLI</strong>
   <br/>
-  <sub>MIT © 2026 · Zero dependencies · 660 LOC · 30 passing tests</sub>
+  <sub>MIT © 2026 · Zero dependencies · 660 LOC · 46 passing tests</sub>
   <br/>
   <sub>
     <a href="#top">Back to top</a>

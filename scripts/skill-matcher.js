@@ -228,15 +228,151 @@ function parseSkillFrontmatter(content) {
  * @param {string[]} [dirs] — directories to scan (default: common skill locations)
  * @returns {Array<{name: string, description: string}>}
  */
-function discoverSkills(dirs) {
-  const defaultDirs = [
+function getDefaultScanDirs() {
+  const dirs = [
     path.join(os.homedir(), '.agents', 'skills'),
     path.join(os.homedir(), '.config', 'opencode', 'skills'),
     path.join(os.homedir(), '.claude', 'skills')
   ];
-  const searchDirs = Array.isArray(dirs) && dirs.length > 0 ? dirs : defaultDirs;
+  const cacheBase = path.join(os.homedir(), '.cache', 'opencode', 'packages');
+  try {
+    const pkgDirs = fs.readdirSync(cacheBase, { withFileTypes: true });
+    for (const d of pkgDirs) {
+      if (d.isDirectory()) {
+        const skillsPath = path.join(cacheBase, d.name, 'node_modules', 'superpowers', 'skills');
+        if (fs.existsSync(skillsPath)) dirs.push(skillsPath);
+      }
+    }
+  } catch {}
+  return dirs;
+}
+
+function scanDirForSkills(dir, seen, collector) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const skillPath = path.join(dir, entry.name, 'SKILL.md');
+    let content;
+    try {
+      content = fs.readFileSync(skillPath, 'utf8');
+    } catch {
+      continue;
+    }
+    const parsed = parseSkillFrontmatter(content);
+    if (parsed && !seen.has(parsed.name)) {
+      seen.add(parsed.name);
+      collector.push(parsed);
+    }
+  }
+}
+
+/**
+ * Discover skills by scanning directories for SKILL.md files.
+ * @param {string[]} [dirs] — directories to scan (default: common skill locations)
+ * @returns {Array<{name: string, description: string}>}
+ */
+function discoverSkills(dirs) {
+  const searchDirs = Array.isArray(dirs) && dirs.length > 0 ? dirs : getDefaultScanDirs();
   const seen = new Set();
   const skills = [];
+
+  for (const dir of searchDirs) {
+    scanDirForSkills(dir, seen, skills);
+  }
+  return skills;
+}
+
+/**
+ * Detect project language, framework, and libraries from project files.
+ * @param {string} [projectDir] — project root to analyze (default: cwd)
+ * @returns {{ language: string|null, framework: string|null, libraries: string[], testingTools: string[] }}
+ */
+function detectProjectContext(projectDir) {
+  const ctx = { language: null, framework: null, libraries: [], testingTools: [] };
+  const dir = projectDir || process.cwd();
+
+  // package.json (Node.js)
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    ctx.language = 'node';
+    const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const depNames = Object.keys(allDeps);
+
+    if (depNames.includes('next')) ctx.framework = 'next';
+    else if (depNames.includes('react')) ctx.framework = 'react';
+    else if (depNames.includes('vue')) ctx.framework = 'vue';
+    else if (depNames.includes('nuxt')) ctx.framework = 'nuxt';
+    else if (depNames.includes('svelte')) ctx.framework = 'svelte';
+    else if (depNames.includes('@nestjs/core')) ctx.framework = 'nest';
+    else if (depNames.includes('express')) ctx.framework = 'express';
+    else if (depNames.includes('fastify')) ctx.framework = 'fastify';
+    else if (depNames.includes('angular')) ctx.framework = 'angular';
+
+    for (const lib of ['prisma','supabase','stripe','tailwindcss','trpc','graphql','zustand','redux','playwright','cypress']) {
+      if (depNames.includes(lib)) ctx.libraries.push(lib);
+    }
+    for (const t of ['jest','vitest','mocha','cypress','playwright']) {
+      if (depNames.includes(t)) ctx.testingTools.push(t);
+    }
+    return ctx;
+  } catch {}
+
+  // pyproject.toml (Python)
+  try {
+    const content = fs.readFileSync(path.join(dir, 'pyproject.toml'), 'utf8');
+    ctx.language = 'python';
+    if (content.includes('django')) ctx.framework = 'django';
+    else if (content.includes('fastapi')) ctx.framework = 'fastapi';
+    else if (content.includes('flask')) ctx.framework = 'flask';
+    for (const lib of ['sqlalchemy','alembic','celery','redis','pytest']) {
+      if (content.includes(lib)) ctx.libraries.push(lib);
+    }
+    if (content.includes('pytest')) ctx.testingTools.push('pytest');
+    return ctx;
+  } catch {}
+
+  // Cargo.toml (Rust)
+  try {
+    const content = fs.readFileSync(path.join(dir, 'Cargo.toml'), 'utf8');
+    ctx.language = 'rust';
+    if (content.includes('axum')) ctx.framework = 'axum';
+    else if (content.includes('actix-web')) ctx.framework = 'actix-web';
+    else if (content.includes('rocket')) ctx.framework = 'rocket';
+    for (const lib of ['diesel','sqlx','tokio','serde']) {
+      if (content.includes(lib)) ctx.libraries.push(lib);
+    }
+    return ctx;
+  } catch {}
+
+  // go.mod (Go)
+  try {
+    const content = fs.readFileSync(path.join(dir, 'go.mod'), 'utf8');
+    ctx.language = 'go';
+    if (content.includes('gin')) ctx.framework = 'gin';
+    else if (content.includes('echo')) ctx.framework = 'echo';
+    else if (content.includes('fiber')) ctx.framework = 'fiber';
+    return ctx;
+  } catch {}
+
+  return ctx;
+}
+
+/**
+ * Scan skill directories and write a lightweight skills index with paths.
+ * @param {string} [outputPath] — path for .skills-index.json (default: cwd/.skills-index.json)
+ * @param {string[]} [scanDirs] — directories to scan (default: common skill locations)
+ * @param {object} [projectContext] — optional project context to embed in the index
+ * @returns {Array<{name: string, description: string, path: string}>}
+ */
+function buildSkillIndex(outputPath, scanDirs, projectContext) {
+  const searchDirs = Array.isArray(scanDirs) && scanDirs.length > 0 ? scanDirs : getDefaultScanDirs();
+  const seen = new Set();
+  const index = [];
 
   for (const dir of searchDirs) {
     let entries;
@@ -257,11 +393,17 @@ function discoverSkills(dirs) {
       const parsed = parseSkillFrontmatter(content);
       if (parsed && !seen.has(parsed.name)) {
         seen.add(parsed.name);
-        skills.push(parsed);
+        index.push({ name: parsed.name, description: parsed.description, path: skillPath });
       }
     }
   }
-  return skills;
+
+  const out = outputPath || path.join(process.cwd(), '.skills-index.json');
+  const output = projectContext
+    ? { project: projectContext, skills: index }
+    : index;
+  fs.writeFileSync(out, JSON.stringify(output, null, 2), 'utf8');
+  return output;
 }
 
 /**
@@ -295,6 +437,40 @@ function printScore(taskText, customPath) {
   const results = score(skills, taskText);
   console.log(JSON.stringify(results, null, 2));
   return true;
+}
+
+const AGENTS_MD_HOOK = `## Global Session Start
+
+ALWAYS invoke the \`auto-skill-select\` skill at the very start of every session (before any other action or clarifying question), AND re-invoke it before EVERY new task mid-session. Do not skip re-invocation — even if you remember the previous match. Task context changes; the skill match should too.
+
+You MUST follow Karpathy Guidelines (loaded via instructions) for every response: think before coding, simplicity first, surgical changes, goal-driven execution.
+`;
+
+const AGENTS_MD_CHECK = 'auto-skill-select';
+
+/**
+ * Check and setup AGENTS.md with auto-invoke hook.
+ * @param {string} [agentsPath] — path to AGENTS.md (default: ~/.config/opencode/AGENTS.md)
+ * @returns {{ status: string, path: string }}
+ */
+function setupAgentsMd(agentsPath) {
+  const target = agentsPath || path.join(os.homedir(), '.config', 'opencode', 'AGENTS.md');
+  let content;
+  try {
+    content = fs.readFileSync(target, 'utf8');
+  } catch {
+    // File doesn't exist — create it
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, AGENTS_MD_HOOK, 'utf8');
+    return { status: 'created', path: target };
+  }
+
+  if (content.includes(AGENTS_MD_CHECK)) {
+    return { status: 'already-present', path: target };
+  }
+
+  fs.writeFileSync(target, content.trimEnd() + '\n\n' + AGENTS_MD_HOOK, 'utf8');
+  return { status: 'appended', path: target };
 }
 
 function main() {
@@ -348,8 +524,40 @@ function main() {
     return;
   }
 
+  if (args[0] === '--index' || args[0] === '-i') {
+    const outputPath = args[1] ? path.resolve(args[1]) : undefined;
+    const scanDirs = args[2] ? [args[2]] : undefined;
+    const count = buildSkillIndex(outputPath, scanDirs).length;
+    console.log(`Indexed ${count} skills → ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
+    return;
+  }
+
+  if (args[0] === '--setup') {
+    const result = setupAgentsMd(args[1] ? path.resolve(args[1]) : undefined);
+    if (result.status === 'already-present') {
+      console.log(`✓ auto-skill-select hook already present in ${result.path}`);
+    } else if (result.status === 'created') {
+      console.log(`✓ Created ${result.path} with auto-skill-select hook`);
+    } else {
+      console.log(`✓ Appended auto-skill-select hook to ${result.path}`);
+    }
+    return;
+  }
+
+  if (args[0] === '--enrich' || args[0] === '-e') {
+    const projectDir = args[1] ? path.resolve(args[1]) : undefined;
+    const outputPath = args[2] ? path.resolve(args[2]) : undefined;
+    const scanDirs = args[3] ? [args[3]] : undefined;
+    const ctx = detectProjectContext(projectDir);
+    const output = buildSkillIndex(outputPath, scanDirs, ctx);
+    const count = output.skills.length;
+    console.log(`Indexed ${count} skills with project context → ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
+    if (ctx.language) console.log(`  ${ctx.language}${ctx.framework ? '/' + ctx.framework : ''}${ctx.libraries.length > 0 ? ' [' + ctx.libraries.join(', ') + ']' : ''}`);
+    return;
+  }
+
   printScore(args[0], args[1]);
 }
 
 if (require.main === module) main();
-module.exports = { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills };
+module.exports = { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd };

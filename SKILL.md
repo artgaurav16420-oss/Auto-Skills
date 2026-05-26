@@ -1,19 +1,63 @@
 ---
 name: auto-skill-select
-description: Automatically selects and invokes the best matching skill for any given task using hybrid keyword + semantic analysis. Scans all installed skills from context and auto-invokes the top match. Use when starting any task to ensure no relevant skill is missed, or when uncertain which skill applies.
+description: Automatically selects and invokes the best matching skill for any given task using hybrid keyword + semantic analysis. Always loads Caveman + Karpathy Guidelines + Superpowers as a permanent base layer on every task. Uses a lightweight skills index instead of scanning the system prompt, reducing context overhead by ~85%. Re-runs on every task change, not just session start.
 ---
 
 # Auto Skill Selection
 
 ## Overview
 
-Systematically match user tasks to installed skills and auto-invoke the best match. This runs at the START of every task before any other action.
+Three skills are **always loaded** on every task (base layer), then a task-specific skill is selected on top.
 
-**Architecture**: The auto-selection workflow is executed by the LLM reading this skill. The companion CLI tool (`scripts/skill-matcher.js`) provides deterministic pre-scoring for testing and debugging. The actual reasoned semantic assessment (0-60) is performed by the LLM during workflow execution.
+This workflow re-runs on **every task change** — not just session start. When the user pivots (e.g., "debug login" → "build dashboard"), re-evaluate the task-layer match. The base layer loads once per session; the task layer re-scores each time.
+
+**Base layer (always-on):**
+| Skill | Purpose | Source |
+|-------|---------|--------|
+| **Caveman** | Ultra-compressed communication, minimal tokens | `~/.agents/skills/caveman/SKILL.md` |
+| **Karpathy Guidelines** | Think before coding, simplicity first, surgical changes | `~/.agents/skills/karpathy-guidelines/SKILL.md` |
+| **Superpowers** | Skill-invocation discipline — always check skills before acting | Already in system prompt |
+
+**Task layer (matched per-request):**
+All other skills from `.skills-index.json` scored against the user's task.
 
 ## Workflow
 
-### 1. Parse task intent
+### 0. Preflight: Ensure skills index exists
+
+If `.skills-index.json` is missing, ask the user to regenerate:
+
+```bash
+node path/to/scripts/skill-matcher.js --index
+```
+
+### 0a. First-time setup: Check AGENTS.md hook
+
+Check if the user's AGENTS.md file (`~/.config/opencode/AGENTS.md`) contains the `auto-skill-select` invocation line. If not, offer to set it up:
+
+> *"I notice your AGENTS.md doesn't have the auto-skill-select hook yet. Want me to add it? This ensures I re-run skill matching on every task."*
+
+If the user agrees, either:
+- **LLM-assisted**: Read AGENTS.md, append the hook via `Edit` tool
+- **CLI‑assisted**: Run `node path/to/scripts/skill-matcher.js --setup`
+- **Manual**: Show them the snippet to add
+
+After setup, this check won't trigger again.
+
+### 1. Load permanent base layer
+
+Always load these three skills immediately (read their SKILL.md files from the paths below):
+
+```
+caveman       → C:\Users\INP\.agents\skills\caveman\SKILL.md
+karpathy-guidelines → C:\Users\INP\.agents\skills\karpathy-guidelines\SKILL.md
+```
+
+Superpowers discipline is already in the system prompt — acknowledge it, don't re-read.
+
+Apply their rules as context for the entire session.
+
+### 2. Parse task intent
 
 Extract from the user's request:
 - **Domain**: frontend, backend, testing, design, data, docs, devops, config, ...
@@ -21,14 +65,27 @@ Extract from the user's request:
 - **Technologies**: react, typescript, python, docker, supabase, ...
 - **Keywords**: specific terms that narrow the task (e.g., "migration", "realtime", "auth")
 
-### 2. Scan installed skills
+### 3. Load skills from index
 
-Read `available_skills` from system prompt. For each skill, extract:
-- **name** — skill identifier
-- **description** — what it does
-- **triggers** — implicit keywords from the description (e.g., "bug" for `diagnose`, "test" for `tdd`)
+Use the `Read` tool to load `.skills-index.json`.
 
-### 3. Hybrid scoring (0-100)
+**If the index is enriched** (has a `project` key at the top), it contains:
+```json
+{
+  "project": { "language": "node", "framework": "next", "libraries": ["prisma"], "testingTools": ["jest"] },
+  "skills": [
+    { "name": "diagnose", "description": "Disciplined diagnosis loop...", "path": "..." }
+  ]
+}
+```
+
+Use the `project` context to inform scoring — e.g., if the project uses Next.js, boost skills mentioning "react" or "next".
+
+**If the index is plain** (flat array), proceed with direct matching.
+
+Exclude the three base-layer skills (Caveman, Karpathy, Superpowers) — already loaded.
+
+### 4. Hybrid scoring (0-100)
 
 **Keyword overlap (0-40):**
 Count matching domain/action/tech keywords between task and each skill's description. Normalize to 0-40.
@@ -39,17 +96,20 @@ Reasoned assessment:
 - Does the skill cover the task's specific pain point? (+20)
 - Is the skill designed for this level of complexity? (+10)
 
-### 4. Threshold-based invocation
+**Project context bonus (optional, +0-10):**
+If the index is enriched with project context, boost scores for skills whose descriptions match the project's detected language, framework, or libraries. This is a reasoned bonus — not a strict rule.
+
+### 5. Threshold-based invocation
 
 | Score | Action |
 |-------|--------|
-| > 70 | **Auto-invoke**. Call `skill` tool. Announce: "Using [skill] for [purpose]" |
+| > 70 | **Auto-invoke**. Read the winning skill's SKILL.md from its `path`. Call the `skill` tool. Announce: "Using [skill] for [purpose]" |
 | 40-70 | **Prompt user**: "These skills might help: [top 2-3]. Which should I use?" |
-| < 40 | **No match**. Proceed without skills. |
+| < 40 | **No match → suggest install**. Reason from task intent what skill would help. Name it, describe what it does, and explain why it fits. Ask if they want to find or create it. Then proceed with base layer only. |
 
-### 5. Persistence
+### 6. Load the matched skill
 
-If top skill is already loaded (e.g., caveman, karpathy), don't reload. Just apply its rules.
+For the winning skill (or the user's pick), `Read` the file at the `path` stored in the index, then follow that skill's workflow instructions for the task.
 
 ## Design Rationale
 
@@ -57,6 +117,15 @@ If top skill is already loaded (e.g., caveman, karpathy), don't reload. Just app
 - **Keyword overlap (0-40)**: Direct domain/action/technology keyword matches provide high-precision signal. Capped at 40 to prevent over-weighting exact matches.
 - **Token overlap (0-60)**: Broader term matching captures semantic relatedness beyond exact keyword hits. Higher weight allows contextual matching to dominate overall scoring.
 - **Thresholds**: >70 auto-invoke ensures high-confidence matches fire automatically. 40-70 prompts for user confirmation. <40 skips to avoid false positives.
+- **Index-based loading**: Using `.skills-index.json` (~5KB for 50 skills) instead of the system prompt (~50KB+) reduces per-session context overhead by ~85%.
+
+### Why always-on base layer?
+Caveman, Karpathy Guidelines, and Superpowers are **meta-skills** that apply to every interaction regardless of domain:
+- **Caveman** keeps responses token-efficient
+- **Karpathy** prevents overcomplication, scope creep, and silent assumptions
+- **Superpowers** ensures no relevant skill is missed
+
+They cost ~0 added context because they're already in the prompt or trivially small.
 
 ## Utility
 
@@ -66,20 +135,27 @@ For deterministic pre-scoring of skill-task matches:
 # Interactive mode (prompts for task description)
 node scripts/skill-matcher.js
 
-# Batch mode (task text as first arg, optional skills JSON file as second)
+# Batch mode
 SKILLS_JSON='[{"name":"test","description":"testing framework"}]' node scripts/skill-matcher.js "fix login bug"
 
 # From file
 node scripts/skill-matcher.js "fix login bug" ./path/to/skills.json
+
+# Build lightweight skills index for LLM workflow
+node scripts/skill-matcher.js --index
+
+# Build enriched index with project context detection (reads package.json, etc.)
+node scripts/skill-matcher.js --enrich
 ```
-
-The `SKILLS_JSON` environment variable accepts a JSON array of `{name, description}` objects. This is the primary mechanism for injecting the actual `available_skills` list into the CLI tool.
-
-The semantic scoring in the CLI tool uses token-overlap heuristics as an approximation. The full reasoned assessment (0-60) is performed by the LLM during workflow step 3.
 
 ## Rules
 
 - Run this before ANY clarifying question. Skill context may change what you ask.
-- If multiple skills score > 70, invoke the highest. Mention the runner-up.
-- If a skill was already loaded by the user, skip auto-invocation — you're already using it.
+- **Re-run on every task change.** Detect task switches by parsing user messages — new domain, action, or technology signals a shift. On task change, skip step 0 (index still valid) and step 1 (base layer still loaded); re-run from step 2.
+- On session start, run full workflow (steps 0-6). On mid-session task switch, run steps 2-6 only.
+- Always load Caveman + Karpathy Guidelines + Superpowers first — they are non-negotiable on every task.
+- After base layer, find the best task-specific skill and load it on top.
+- If multiple task-specific skills score > 70, invoke the highest. Mention the runner-up.
+- If a skill was already loaded, don't reload. Just apply its rules.
 - Never skip this workflow because you "know what the task is." Surface assumptions first.
+- If `.skills-index.json` is missing or stale, ask the user to run `--index` to regenerate it.

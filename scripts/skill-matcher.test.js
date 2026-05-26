@@ -4,7 +4,7 @@ const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
-const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills } = require('./skill-matcher');
+const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd } = require('./skill-matcher');
 
 describe('tokenize', () => {
   it('splits text into normalized tokens', () => {
@@ -302,6 +302,156 @@ description: Duplicate of skill-a
   });
 });
 
+describe('buildSkillIndex', () => {
+  const tmpDir = path.join(__dirname, '..', '.code-review-cache', 'test-index');
+
+  beforeEach(() => {
+    fs.mkdirSync(path.join(tmpDir, 'skill-x'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'skill-y'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'skill-x', 'SKILL.md'),
+      '---\nname: skill-x\ndescription: The X skill\n---');
+    fs.writeFileSync(path.join(tmpDir, 'skill-y', 'SKILL.md'),
+      '---\nname: skill-y\ndescription: The Y skill\n---');
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  });
+
+  it('writes index to specified output path', () => {
+    const outPath = path.join(tmpDir, 'test-index.json');
+    const result = buildSkillIndex(outPath, [tmpDir]);
+    assert.strictEqual(result.length, 2);
+    const loaded = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    assert.strictEqual(loaded.length, 2);
+  });
+
+  it('includes path field for each skill entry', () => {
+    const outPath = path.join(tmpDir, 'paths.json');
+    const result = buildSkillIndex(outPath, [tmpDir]);
+    assert.ok(result.every(s => s.path));
+    assert.ok(result[0].path.endsWith('SKILL.md'));
+  });
+
+  it('returns empty array for empty directory', () => {
+    const emptyDir = path.join(tmpDir, 'nothing-here');
+    fs.mkdirSync(emptyDir, { recursive: true });
+    const result = buildSkillIndex(path.join(tmpDir, 'empty.json'), [emptyDir]);
+    assert.deepStrictEqual(result, []);
+  });
+});
+
+describe('detectProjectContext', () => {
+  const sandbox = path.join(__dirname, '..', '.code-review-cache', 'test-project-detect');
+
+  beforeEach(() => {
+    fs.mkdirSync(sandbox, { recursive: true });
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(sandbox, { recursive: true, force: true }); } catch {}
+  });
+
+  it('detects Node + React project', () => {
+    fs.writeFileSync(path.join(sandbox, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18', next: '^13' },
+      devDependencies: { jest: '^29' }
+    }));
+    const ctx = detectProjectContext(sandbox);
+    assert.strictEqual(ctx.language, 'node');
+    assert.strictEqual(ctx.framework, 'next');
+    assert.ok(ctx.testingTools.includes('jest'));
+  });
+
+  it('detects Node + Express with libraries', () => {
+    fs.writeFileSync(path.join(sandbox, 'package.json'), JSON.stringify({
+      dependencies: { express: '^4', prisma: '^5', stripe: '^12' },
+      devDependencies: { vitest: '^1' }
+    }));
+    const ctx = detectProjectContext(sandbox);
+    assert.strictEqual(ctx.language, 'node');
+    assert.strictEqual(ctx.framework, 'express');
+    assert.ok(ctx.libraries.includes('prisma'));
+    assert.ok(ctx.libraries.includes('stripe'));
+    assert.ok(ctx.testingTools.includes('vitest'));
+  });
+
+  it('returns empty context for unknown project', () => {
+    const ctx = detectProjectContext(sandbox);
+    assert.strictEqual(ctx.language, null);
+    assert.strictEqual(ctx.framework, null);
+    assert.deepStrictEqual(ctx.libraries, []);
+    assert.deepStrictEqual(ctx.testingTools, []);
+  });
+
+  it('wraps enriched index with project field', () => {
+    fs.writeFileSync(path.join(sandbox, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18' }
+    }));
+    fs.mkdirSync(path.join(sandbox, 'test-skill'), { recursive: true });
+    fs.writeFileSync(path.join(sandbox, 'test-skill', 'SKILL.md'),
+      '---\nname: test-skill\ndescription: A test\n---');
+    const ctx = detectProjectContext(sandbox);
+    const outPath = path.join(sandbox, 'enriched.json');
+    const result = buildSkillIndex(outPath, [sandbox], ctx);
+    assert.ok(result.project);
+    assert.strictEqual(result.project.framework, 'react');
+    assert.ok(Array.isArray(result.skills));
+    assert.strictEqual(result.skills.length, 1);
+    const loaded = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    assert.ok(loaded.project);
+    assert.ok(Array.isArray(loaded.skills));
+  });
+});
+
+describe('setupAgentsMd', () => {
+  const sandbox = path.join(__dirname, '..', '.code-review-cache', 'test-agents-setup');
+  const fakeAgents = path.join(sandbox, 'AGENTS.md');
+
+  beforeEach(() => {
+    fs.mkdirSync(sandbox, { recursive: true });
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(sandbox, { recursive: true, force: true }); } catch {}
+  });
+
+  it('creates file with hook when AGENTS.md does not exist', () => {
+    const result = setupAgentsMd(fakeAgents);
+    assert.strictEqual(result.status, 'created');
+    assert.ok(fs.existsSync(fakeAgents));
+    const content = fs.readFileSync(fakeAgents, 'utf8');
+    assert.ok(content.includes('auto-skill-select'));
+    assert.ok(content.includes('EVERY new task'));
+  });
+
+  it('appends hook when AGENTS.md exists without it', () => {
+    fs.writeFileSync(fakeAgents, '# My config\n\nSome existing content.\n', 'utf8');
+    const result = setupAgentsMd(fakeAgents);
+    assert.strictEqual(result.status, 'appended');
+    const content = fs.readFileSync(fakeAgents, 'utf8');
+    assert.ok(content.includes('Some existing content'));
+    assert.ok(content.includes('auto-skill-select'));
+  });
+
+  it('does not duplicate hook when already present', () => {
+    fs.writeFileSync(fakeAgents, 'Some text auto-skill-select more text\n', 'utf8');
+    const result = setupAgentsMd(fakeAgents);
+    assert.strictEqual(result.status, 'already-present');
+    const content = fs.readFileSync(fakeAgents, 'utf8');
+    assert.strictEqual(content.trim(), 'Some text auto-skill-select more text');
+  });
+
+  it('prints correct message via --setup CLI flag', () => {
+    fs.writeFileSync(fakeAgents, 'something auto-skill-select something\n', 'utf8');
+    const out = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --setup "${fakeAgents}"`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    assert.ok(out.includes('already present'));
+  });
+});
+
 describe('main (CLI entry point)', () => {
   const testSkillsPath = path.join(__dirname, '..', '.code-review-cache', 'test-skills.json');
 
@@ -344,6 +494,55 @@ description: A skill for debugging code
       assert.ok(result.includes('score'));
     } finally {
       try { fs.rmSync(scanDir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  it('prints indexed count with --index flag', () => {
+    const indexDir = path.join(__dirname, '..', '.code-review-cache', 'index-integration');
+    const indexOut = path.join(indexDir, 'cli-index.json');
+    fs.mkdirSync(path.join(indexDir, 'sample-skill'), { recursive: true });
+    fs.writeFileSync(path.join(indexDir, 'sample-skill', 'SKILL.md'),
+      '---\nname: sample-skill\ndescription: A sample skill\n---');
+    try {
+      const result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --index "${indexOut}" "${indexDir}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      assert.ok(result.includes('Indexed'));
+      const loaded = JSON.parse(fs.readFileSync(indexOut, 'utf8'));
+      assert.strictEqual(loaded.length, 1);
+      assert.strictEqual(loaded[0].name, 'sample-skill');
+      assert.ok(loaded[0].path);
+    } finally {
+      try { fs.rmSync(indexDir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  it('prints enriched index with --enrich flag', () => {
+    const enrichDir = path.join(__dirname, '..', '.code-review-cache', 'enrich-integration');
+    fs.mkdirSync(path.join(enrichDir, 'demo-skill'), { recursive: true });
+    fs.writeFileSync(path.join(enrichDir, 'demo-skill', 'SKILL.md'),
+      '---\nname: demo-skill\ndescription: A demo skill\n---');
+    fs.writeFileSync(path.join(enrichDir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18' },
+      devDependencies: { jest: '^29' }
+    }));
+    const enrichOut = path.join(enrichDir, 'ind.json');
+    try {
+      const result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --enrich "${enrichDir}" "${enrichOut}" "${enrichDir}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      assert.ok(result.includes('project context'));
+      assert.ok(result.includes('react'));
+      const loaded = JSON.parse(fs.readFileSync(enrichOut, 'utf8'));
+      assert.ok(loaded.project);
+      assert.strictEqual(loaded.project.language, 'node');
+      assert.strictEqual(loaded.project.framework, 'react');
+      assert.strictEqual(loaded.skills.length, 1);
+      assert.strictEqual(loaded.skills[0].name, 'demo-skill');
+    } finally {
+      try { fs.rmSync(enrichDir, { recursive: true, force: true }); } catch {}
     }
   });
 });
