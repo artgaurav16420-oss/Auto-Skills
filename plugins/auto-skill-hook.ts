@@ -28,9 +28,13 @@ function stripParts(parts) {
 export const AutoSkillHook = async ({ client }) => {
   return {
     "experimental.chat.system.transform": async (_input, output) => {
-      if (typeof output.system === "string" && SKILLS_RE.test(output.system)) {
-        SKILLS_RE.lastIndex = 0
-        output.system = output.system.replace(SKILLS_RE, REPLACEMENT)
+      if (Array.isArray(output.system)) {
+        for (let i = 0; i < output.system.length; i++) {
+          if (SKILLS_RE.test(output.system[i])) {
+            SKILLS_RE.lastIndex = 0
+            output.system[i] = output.system[i].replace(SKILLS_RE, REPLACEMENT)
+          }
+        }
       }
     },
 
