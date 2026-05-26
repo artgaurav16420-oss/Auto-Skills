@@ -1,0 +1,140 @@
+[
+  {
+    "name": "diagnose",
+    "description": "Disciplined debugging loop: reproduce, minimise, hypothesise, instrument, fix, regression-test",
+    "category": "debugging",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/diagnose"
+  },
+  {
+    "name": "brainstorming",
+    "description": "Design exploration before implementation — surfaces requirements, constraints, and alternatives",
+    "category": "planning",
+    "install": "npm install -g superpowers"
+  },
+  {
+    "name": "writing-plans",
+    "description": "Turn specs into structured multi-step implementation plans before touching code",
+    "category": "planning",
+    "install": "npm install -g superpowers"
+  },
+  {
+    "name": "tdd",
+    "description": "Test-driven development: red-green-refactor loop for features and bugfixes",
+    "category": "testing",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/tdd"
+  },
+  {
+    "name": "test-driven-development",
+    "description": "Write tests before implementation code. Red-green-refactor cycle with verification",
+    "category": "testing",
+    "install": "npm install -g superpowers"
+  },
+  {
+    "name": "grill-me",
+    "description": "Stress-test plans through relentless questioning until shared understanding is reached",
+    "category": "planning",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/grill-me"
+  },
+  {
+    "name": "zoom-out",
+    "description": "Get broader architecture context and high-level perspective on unfamiliar code sections",
+    "category": "exploration",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/zoom-out"
+  },
+  {
+    "name": "requesting-code-review",
+    "description": "Verify work meets requirements before committing or merging",
+    "category": "quality",
+    "install": "npm install -g superpowers"
+  },
+  {
+    "name": "complete-codebase-review",
+    "description": "Full architectural audit: security, tech debt, test health, deps, docs, CI",
+    "category": "quality",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/complete-codebase-review"
+  },
+  {
+    "name": "improve-codebase-architecture",
+    "description": "Find refactoring opportunities, consolidate modules, improve testability",
+    "category": "refactoring",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/improve-codebase-architecture"
+  },
+  {
+    "name": "triage",
+    "description": "Issue triage state machine: review incoming bugs/features, prepare issues for AFK agents",
+    "category": "project-management",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/triage"
+  },
+  {
+    "name": "to-issues",
+    "description": "Break plans/PRDs into independently-grabbable issues using vertical slices",
+    "category": "project-management",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/to-issues"
+  },
+  {
+    "name": "to-prd",
+    "description": "Turn conversation context into a published PRD on the project issue tracker",
+    "category": "project-management",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/to-prd"
+  },
+  {
+    "name": "ui-ux-pro-max",
+    "description": "UI/UX design intelligence: 50+ styles, 161 color palettes, 57 font pairings, 25 chart types",
+    "category": "design",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/ui-ux-pro-max"
+  },
+  {
+    "name": "opencode-automation-recommender",
+    "description": "Analyze codebase and recommend optimal OpenCode setup: MCP servers, skills, subagents, formatters",
+    "category": "devops",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/opencode-automation-recommender"
+  },
+  {
+    "name": "gitnexus-cli",
+    "description": "Run GitNexus CLI commands: analyze/index repos, check status, generate wiki",
+    "category": "exploration",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/gitnexus-cli"
+  },
+  {
+    "name": "gitnexus-exploring",
+    "description": "Understand code architecture, trace execution flows, explore unfamiliar codebase sections",
+    "category": "exploration",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/gitnexus-exploring"
+  },
+  {
+    "name": "gitnexus-impact-analysis",
+    "description": "Safety analysis before editing — what depends on X, what will break if changed",
+    "category": "exploration",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/gitnexus-impact-analysis"
+  },
+  {
+    "name": "ckm:design",
+    "description": "Comprehensive design: branding, logos, mockups, HTML slides, banners, icons, social photos",
+    "category": "design",
+    "install": "npm install -g superpowers"
+  },
+  {
+    "name": "ckm:slides",
+    "description": "Strategic HTML presentations with Chart.js, design tokens, responsive layouts",
+    "category": "design",
+    "install": "npm install -g superpowers"
+  },
+  {
+    "name": "setup-matt-pocock-skills",
+    "description": "Configure engineering skills with issue tracker, triage labels, and domain doc layout",
+    "category": "devops",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/setup-matt-pocock-skills"
+  },
+  {
+    "name": "rrcat-tender",
+    "description": "Generate RRCAT procurement tender specs following Indian government open-tendering rules",
+    "category": "domain-specific",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/rrcat-tender"
+  },
+  {
+    "name": "find-skills",
+    "description": "Discover and install agent skills by capability — answers 'how do I X', 'is there a skill for Y'",
+    "category": "meta",
+    "install": "git clone https://github.com/artgaurav16420-oss/Auto-Skills.git ~/.agents/skills/find-skills"
+  }
+]

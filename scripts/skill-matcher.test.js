@@ -4,7 +4,7 @@ const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
-const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd } = require('./skill-matcher');
+const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd, loadCatalog } = require('./skill-matcher');
 
 describe('tokenize', () => {
   it('splits text into normalized tokens', () => {
@@ -449,6 +449,27 @@ describe('setupAgentsMd', () => {
       { encoding: 'utf8', timeout: 5000 }
     );
     assert.ok(out.includes('already present'));
+  });
+});
+
+describe('loadCatalog', () => {
+  it('loads known-skills.json with entries', () => {
+    const cat = loadCatalog();
+    assert.ok(Array.isArray(cat));
+    assert.ok(cat.length > 0);
+    assert.ok(cat.every(s => s.name && s.description && s.category && s.install));
+  });
+
+  it('prints via --catalog CLI flag', () => {
+    const out = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --catalog`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const parsed = JSON.parse(out.trim());
+    assert.ok(Array.isArray(parsed));
+    assert.ok(parsed.length > 0);
+    assert.ok(parsed[0].name);
+    assert.ok(parsed[0].install);
   });
 });
 
