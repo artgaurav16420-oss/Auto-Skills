@@ -205,6 +205,7 @@ describe('main (CLI entry point)', () => {
   const testSkillsPath = path.join(__dirname, '..', '.code-review-cache', 'test-skills.json');
 
   beforeEach(() => {
+    fs.mkdirSync(path.dirname(testSkillsPath), { recursive: true });
     fs.writeFileSync(testSkillsPath, JSON.stringify([
       { name: 'test', description: 'A test skill for integration testing' }
     ]), 'utf8');
