@@ -167,8 +167,7 @@ node scripts/skill-matcher.js --multi --threshold 60 "debug login flow" ./skills
 - **Re-run on every task change.** Detect task switches by parsing user messages — new domain, action, or technology signals a shift. On task change, skip step 0 (index still valid) and step 1 (base layer still loaded); re-run from step 2.
 - On session start, run full workflow (steps 0-6). On mid-session task switch, run steps 2-6 only.
 - Always load Caveman + Karpathy Guidelines + Superpowers first — they are non-negotiable on every task.
-- After base layer, find all task-specific skills scoring >70 and load the top results (multi if 70-90, single if >90).
-- If multiple task-specific skills score >70, load all of them (deduplicating aliases). If multiple score >90, only the highest.
+- After base layer, find all task-specific skills scoring >=70 and load the top results (multi if all are 70-90, single if the highest is >90).\n- If the highest-scoring skill is >90, load only that single skill. If no skill is >90 but multiple skills score 70-90, load all of them (deduplicating aliases).
 - If a skill was already loaded, don't reload. Just apply its rules.
 - Never skip this workflow because you "know what the task is." Surface assumptions first.
 - If `.skills-index.json` is missing or stale, ask the user to run `--index` to regenerate it.
