@@ -137,14 +137,15 @@ function tokenize(text, opts) {
  * @returns {{ domains: string[], actions: string[], technologies: string[], keywords: string[] }}
  */
 function extractIntent(text) {
-  const tokens = tokenize(text, { expandSynonyms: true });
+  const rawTokens = tokenize(text);
+  const expandedTokens = tokenize(text, { expandSynonyms: true });
   return {
-    domains: tokens.filter(t => DOMAIN_KEYWORDS.has(t)),
-    actions: tokens.filter(t => ACTION_KEYWORDS.has(t)),
-    technologies: tokens.filter(t => TECH_KEYWORDS.has(t)),
-    keywords: tokens.filter(t =>
+    domains:     [...new Set(rawTokens.filter(t => DOMAIN_KEYWORDS.has(t)))],
+    actions:     [...new Set(rawTokens.filter(t => ACTION_KEYWORDS.has(t)))],
+    technologies:[...new Set(rawTokens.filter(t => TECH_KEYWORDS.has(t)))],
+    keywords:    [...new Set(expandedTokens.filter(t =>
       !DOMAIN_KEYWORDS.has(t) && !ACTION_KEYWORDS.has(t) && !TECH_KEYWORDS.has(t)
-    )
+    ))]
   };
 }
 
