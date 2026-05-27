@@ -132,9 +132,20 @@ function tokenize(text, opts) {
 }
 
 /**
- * Extract structured intent (domain, action, technology, keywords) from task text.
+ * Extract structured intent (domain, action, technology, keywords)
+ * from task text using a two-pass tokenization strategy.
+ *
+ * Pass 1 (raw tokens): classify into domain/action/tech using the
+ * original input tokens only. This keeps totalIntent accurate for
+ * computeKeywordScore — synonym expansion cannot inflate the denominator.
+ *
+ * Pass 2 (expanded tokens): synonym-expanded tokens that are NOT
+ * domain/action/tech go into keywords, widening the pool for
+ * computeTokenOverlapScore recall without corrupting intent counts.
+ *
  * @param {string} text — task description
- * @returns {{ domains: string[], actions: string[], technologies: string[], keywords: string[] }}
+ * @returns {{ domains: string[], actions: string[],
+ *             technologies: string[], keywords: string[] }}
  */
 function extractIntent(text) {
   const rawTokens = tokenize(text);
