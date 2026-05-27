@@ -4,7 +4,7 @@
 </picture>
 
 <p align="center">
-   <img src="https://img.shields.io/badge/tests-77%2F77-brightgreen?style=flat-square&logo=vitest" alt="Tests">
+   <img src="https://img.shields.io/badge/tests-85%2F85-brightgreen?style=flat-square&logo=vitest" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js" alt="Node">
   <img src="https://img.shields.io/badge/dependencies-0%20required-success?style=flat-square" alt="Dependencies">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
@@ -34,7 +34,7 @@ Built for developers who want their AI tools to be **proactive**, not reactive.
 | 🛡️ | **Secure by Default** — path traversal protection, no telemetry, no network calls | Your code never leaves your machine |
 | 🔍 | **Auto-Discovery** — `--scan` finds every installed skill | Score your entire skillset with one command |
 | 🏷️ | **Index Mode** — `--index` builds a lightweight skills index | Reduce LLM prompt overhead by ~85% |
-| 📦 | **Self-Contained** — 8 files, ~660 LOC | Fully auditable in an afternoon |
+| 📦 | **Self-Contained** — ~17 files, ~900 LOC | Fully auditable in an afternoon |
 
 ---
 
@@ -80,7 +80,7 @@ Once your task is tokenized and analyzed, the skill with the highest score is ei
 | **Tokenize** | Lowercase, strip punctuation, remove stop words |
 | **Extract Intent** | Classify tokens into domain, action, technology, keywords |
 | **Keyword Overlap (0-40)** | Match domain/action/tech tokens against skill descriptions |
-| **Semantic Overlap (0-60)** | Match remaining keywords at word boundaries against skill descriptions |
+| **Semantic Overlap (0-60)** | Match all task tokens (including synonym-expanded keywords) against skill descriptions at word boundaries |
 
 The **40/60 split** ensures exact keyword hits don't override broader contextual fit.
 
@@ -320,7 +320,7 @@ auto-skill-select/
   <br/>
   <strong>OpenCode</strong> · <strong>Claude Code</strong> · <strong>Gemini CLI</strong>
   <br/>
-  <sub>MIT © 2026 · Zero required dependencies · 660 LOC · 77 passing tests</sub>
+  <sub>MIT © 2026 · Zero required dependencies · ~900 LOC · 85 passing tests</sub>
   <br/>
   <sub>
     <a href="#top">Back to top</a>
