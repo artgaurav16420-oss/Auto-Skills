@@ -1,6 +1,6 @@
 {
   "name": "auto-skill-select",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "description": "Automatically selects and invokes the best matching skill for any task",
   "main": "scripts/skill-matcher.js",
   "types": "index.d.ts",
