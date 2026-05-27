@@ -37,7 +37,7 @@ async function getSkillInjections(userText: string): Promise<string[] | null> {
     const { loadSkills, score } = await import(pathToFileURL(SKILL_MATCHER).href) as { loadSkills: Function; score: Function }
     const allSkills: any[] = loadSkills(SKILLS_INDEX)
     if (!allSkills?.length) return null
-    const results: any[] = score(allSkills, userText)
+    const results: any[] = await score(allSkills, userText)
     const matched: any[] = results.filter(
       (r: any) => r.score >= 70 && !BASE_SKILLS.has(r.name)
     )
