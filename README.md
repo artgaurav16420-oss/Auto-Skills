@@ -4,7 +4,7 @@
 </picture>
 
 <p align="center">
-   <img src="https://img.shields.io/badge/tests-46%2F46-brightgreen?style=flat-square&logo=vitest" alt="Tests">
+   <img src="https://img.shields.io/badge/tests-55%2F55-brightgreen?style=flat-square&logo=vitest" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js" alt="Node">
   <img src="https://img.shields.io/badge/dependencies-0-success?style=flat-square" alt="Dependencies">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
@@ -195,7 +195,7 @@ The skill auto-activates via `activate_skill` in the session lifecycle.
 
 ## 📚 API Reference
 
-All exported functions have JSDoc annotations and are fully tested (46 tests, all passing).
+All exported functions have JSDoc annotations and are fully tested (55 tests, all passing).
 
 ### `score(skills, taskText)`
 
@@ -262,14 +262,14 @@ discoverSkills(['./custom/skills'])  // → scan specific directories only
 We ❤️ pull requests.
 
 1. **Discuss first** — open an issue before implementing
-2. **Write tests** — run `npm test`, keep all 30 green
+2. **Write tests** — run `npm test`, keep all 55 green
 3. **Follow conventions** — [Conventional Commits](https://www.conventionalcommits.org/), JSDoc on all exports
 4. **Zero deps policy** — no new dependencies without discussion
 
 ```bash
 git clone https://github.com/artgaurav16420-oss/Auto-Skills.git
 cd auto-skill-select
-npm test                              # 46 tests, all green
+npm test                              # 55 tests, all green
 node scripts/skill-matcher.js "..."   # manual smoke test
 ```
 
@@ -297,7 +297,7 @@ auto-skill-select/
   <br/>
   <strong>OpenCode</strong> · <strong>Claude Code</strong> · <strong>Gemini CLI</strong>
   <br/>
-  <sub>MIT © 2026 · Zero dependencies · 660 LOC · 46 passing tests</sub>
+  <sub>MIT © 2026 · Zero dependencies · 660 LOC · 55 passing tests</sub>
   <br/>
   <sub>
     <a href="#top">Back to top</a>
