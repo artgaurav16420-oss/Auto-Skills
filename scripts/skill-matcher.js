@@ -8,7 +8,7 @@ const readline = require('readline');
 const {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache, resetSynonyms, loadSynonyms, computeSemanticScore
+  clearCache, resetSynonyms, loadSynonyms
 } = require('../src/index');
 
 
@@ -18,7 +18,8 @@ function printScore(taskText, customPath, useSemantic) {
     console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
     return false;
   }
-  score(skills, taskText, { useSemantic, computeSemantic: useSemantic ? computeSemanticScore : undefined }).then(results => {
+  const computeSemantic = useSemantic ? require('../src/index').computeSemanticScore : undefined;
+  score(skills, taskText, { useSemantic, computeSemantic }).then(results => {
     console.log(JSON.stringify(results, null, 2));
     return true;
   }).catch(err => {
@@ -164,8 +165,8 @@ async function main() {
       console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
       return;
     }
-    const { computeSemanticScore } = require('../src/semantic-scorer');
-    const results = await score(skills, taskText, { useSemantic: true, computeSemantic: computeSemanticScore });
+    const { computeSemanticScore: cs } = require('../src/index');
+    const results = await score(skills, taskText, { useSemantic: true, computeSemantic: cs });
     console.log(JSON.stringify(results, null, 2));
     return;
   }
