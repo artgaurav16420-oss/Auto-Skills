@@ -24,6 +24,8 @@ module.exports = [
         TextDecoder: 'readonly',
         performance: 'readonly',
         fetch: 'readonly',
+        global: 'readonly',
+        globalThis: 'readonly',
       },
     },
     rules: {
