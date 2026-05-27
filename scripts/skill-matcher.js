@@ -8,7 +8,7 @@ const readline = require('readline');
 const {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache, resetSynonyms, loadSynonyms, computeEmbedding
+  clearCache, resetSynonyms, loadSynonyms, computeSemanticScore
 } = require('../src/index');
 
 
@@ -18,7 +18,7 @@ function printScore(taskText, customPath, useSemantic) {
     console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
     return false;
   }
-  score(skills, taskText, { useSemantic, computeSemantic: computeEmbedding ? undefined : undefined }).then(results => {
+  score(skills, taskText, { useSemantic, computeSemantic: useSemantic ? computeSemanticScore : undefined }).then(results => {
     console.log(JSON.stringify(results, null, 2));
     return true;
   }).catch(err => {
