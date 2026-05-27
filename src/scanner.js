@@ -109,6 +109,8 @@ function loadSkills(customPath) {
  */
 function parseSkillFrontmatter(content) {
   if (!content || typeof content !== 'string') return null;
+  // Normalize CRLF → LF to handle Windows line endings
+  content = content.replace(/\r\n/g, '\n');
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) return null;
   const yaml = match[1];
@@ -187,9 +189,9 @@ function getDefaultScanDirs() {
   try {
     const found = walkForSubdir(cacheBase, path.join('node_modules', 'superpowers', 'skills'));
     dirs.push(...found);
-    } catch (err) {
-      logger.debug(`scanDirForSkills: cannot read dir — ${err.message}`);
-    }
+  } catch (err) {
+    logger.debug(`getDefaultScanDirs: cannot walk ${cacheBase} — ${err.message}`);
+  }
   return dirs;
 }
 
