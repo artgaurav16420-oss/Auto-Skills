@@ -44,6 +44,40 @@ If the user agrees, either:
 
 After setup, this check won't trigger again.
 
+### 0b. OpenCode permission config (optional, recommended)
+
+On OpenCode, the platform auto-injects ALL discovered skills into `<available_skills>`
+in the system prompt. With many skills installed, this can consume ~40KB+ of context.
+Add permission rules to deny non-essential skills — auto-skill-select loads matched
+skills via the `Read` tool (not the `skill` tool), so denying them has no impact:
+
+```jsonc
+// ~/.config/opencode/opencode.jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "~/.agents/skills/karpathy-guidelines/SKILL.md",
+    "~/.agents/skills/auto-skill-select/SKILL.md"
+  ],
+  "permission": {
+    "skill": {
+      "auto-skill-select": "allow",
+      "karpathy-guidelines": "allow",
+      "caveman": "allow",
+      "*": "deny"
+    }
+  }
+}
+```
+
+This shrinks `<available_skills>` from hundreds of entries to just the 3 base
+skills, reclaiming ~40KB of context.
+
+> **Note:** The old `plugins/auto-skill-hook.ts` approach is deprecated. It
+> injected skill content into every user message, causing per-turn context
+> accumulation. The `permission.skill` + `instructions` approach is cleaner
+> and more efficient.
+
 ### 1. Load permanent base layer
 
 Always load these three skills immediately (read their SKILL.md files from the paths below):

@@ -1,3 +1,18 @@
+/**
+ * @deprecated Use `permission.skill` rules in opencode.jsonc instead.
+ *
+ * This hook injected the full auto-skill-select SKILL.md + matched skill content
+ * into every user message, causing per-turn context accumulation (~10KB/turn).
+ *
+ * Recommended replacement (opencode.jsonc):
+ *   - `instructions` to load base-layer SKILL.md files once (system prompt)
+ *   - `permission.skill { "*": "deny" }` to drop <available_skills> bloat
+ *   - Auto-skill-select loads matched skills via Read tool, not skill tool
+ *
+ * Remove this plugin from opencode.json's "plugin" array and add the permission
+ * rules above. See SKILL.md step 0b for full instructions.
+ */
+
 import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
