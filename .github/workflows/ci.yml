@@ -21,3 +21,7 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build:plugin
+      - name: Smoke test --validate
+        run: |
+          node scripts/skill-matcher.js --validate SKILL.md
+          node scripts/skill-matcher.js --validate package.json && exit 1 || true
