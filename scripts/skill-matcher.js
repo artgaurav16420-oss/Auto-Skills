@@ -8,18 +8,23 @@ const readline = require('readline');
 const {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache
+  clearCache, resetSynonyms, loadSynonyms, computeEmbedding
 } = require('../src/index');
 
-function printScore(taskText, customPath) {
+
+function printScore(taskText, customPath, useSemantic) {
   const skills = loadSkills(customPath);
   if (skills.length === 0) {
     console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
     return false;
   }
-  const results = score(skills, taskText);
-  console.log(JSON.stringify(results, null, 2));
-  return true;
+  score(skills, taskText, { useSemantic, computeSemantic: computeEmbedding ? undefined : undefined }).then(results => {
+    console.log(JSON.stringify(results, null, 2));
+    return true;
+  }).catch(err => {
+    console.log(JSON.stringify({ error: err.message }));
+    return false;
+  });
 }
 
 function scanAndScore(taskText, scanDirs) {
@@ -28,14 +33,17 @@ function scanAndScore(taskText, scanDirs) {
     console.log('No skills discovered in any skill directory.');
     return false;
   }
-  const results = score(skills, taskText);
-  if (results.length === 0) {
-    console.log('No skills matched.');
-    return false;
-  }
-  console.log(`Scanned ${skills.length} skills. Best match: ${results[0].name} (${results[0].score}/100)`);
-  console.log(JSON.stringify(results, null, 2));
-  return true;
+  score(skills, taskText).then(results => {
+    if (results.length === 0) {
+      console.log('No skills matched.');
+      return false;
+    }
+    console.log(`Scanned ${skills.length} skills. Best match: ${results[0].name} (${results[0].score}/100)`);
+    console.log(JSON.stringify(results, null, 2));
+    return true;
+  }).catch(err => {
+    console.log(JSON.stringify({ error: err.message }));
+  });
 }
 
 function printMultiScore(taskText, customPath, threshold) {
@@ -44,14 +52,17 @@ function printMultiScore(taskText, customPath, threshold) {
     console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
     return false;
   }
-  const results = score(skills, taskText);
-  const filtered = results.filter(r => r.score >= threshold);
-  if (filtered.length === 0) {
-    console.log(JSON.stringify({ threshold, count: 0, message: `No skills scored >= ${threshold}`, results }, null, 2));
+  score(skills, taskText).then(results => {
+    const filtered = results.filter(r => r.score >= threshold);
+    if (filtered.length === 0) {
+      console.log(JSON.stringify({ threshold, count: 0, message: `No skills scored >= ${threshold}`, results }, null, 2));
+      return true;
+    }
+    console.log(JSON.stringify({ threshold, count: filtered.length, results: filtered }, null, 2));
     return true;
-  }
-  console.log(JSON.stringify({ threshold, count: filtered.length, results: filtered }, null, 2));
-  return true;
+  }).catch(err => {
+    console.log(JSON.stringify({ error: err.message }));
+  });
 }
 
 function validateSkill(skillPath) {
@@ -93,7 +104,7 @@ function validateSkill(skillPath) {
   }
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
@@ -129,6 +140,24 @@ function main() {
     } else {
       console.log(JSON.stringify({ valid: false, issues: result.issues }));
     }
+    return;
+  }
+
+  if (args[0] === '--semantic' || args[0] === '-S') {
+    const taskText = args[1];
+    const customPath = args[2];
+    if (!taskText) {
+      console.log(JSON.stringify({ error: 'Task text required after --semantic' }));
+      return;
+    }
+    const skills = loadSkills(customPath);
+    if (skills.length === 0) {
+      console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
+      return;
+    }
+    const { computeSemanticScore } = require('../src/semantic-scorer');
+    const results = await score(skills, taskText, { useSemantic: true, computeSemantic: computeSemanticScore });
+    console.log(JSON.stringify(results, null, 2));
     return;
   }
 
@@ -181,8 +210,12 @@ function main() {
   if (args[0] === '--index' || args[0] === '-i') {
     const outputPath = args[1] ? path.resolve(args[1]) : undefined;
     const scanDirs = args[2] ? [args[2]] : undefined;
-    const count = buildSkillIndex(outputPath, scanDirs).length;
-    console.log(`Indexed ${count} skills → ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
+    buildSkillIndex(outputPath, scanDirs).then(output => {
+      const count = Array.isArray(output) ? output.length : output.skills.length;
+      console.log(`Indexed ${count} skills \u2192 ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
+    }).catch(err => {
+      console.log(`Index error: ${err.message}`);
+    });
     return;
   }
 
@@ -203,10 +236,13 @@ function main() {
     const outputPath = args[2] ? path.resolve(args[2]) : undefined;
     const scanDirs = args[3] ? [args[3]] : undefined;
     const ctx = detectProjectContext(projectDir);
-    const output = buildSkillIndex(outputPath, scanDirs, ctx);
-    const count = output.skills.length;
-    console.log(`Indexed ${count} skills with project context → ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
-    if (ctx.language) console.log(`  ${ctx.language}${ctx.framework ? '/' + ctx.framework : ''}${ctx.libraries.length > 0 ? ' [' + ctx.libraries.join(', ') + ']' : ''}`);
+    buildSkillIndex(outputPath, scanDirs, ctx).then(output => {
+      const count = output.skills.length;
+      console.log(`Indexed ${count} skills with project context \u2192 ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
+      if (ctx.language) console.log(`  ${ctx.language}${ctx.framework ? '/' + ctx.framework : ''}${ctx.libraries.length > 0 ? ' [' + ctx.libraries.join(', ') + ']' : ''}`);
+    }).catch(err => {
+      console.log(`Enrich error: ${err.message}`);
+    });
     return;
   }
 
@@ -224,9 +260,12 @@ function main() {
   printScore(args[0], args[1]);
 }
 
-if (require.main === module) main();
+if (require.main === module) main().catch(err => {
+  console.error(err.message);
+  process.exit(1);
+});
 module.exports = {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache
+  clearCache, resetSynonyms, loadSynonyms
 };

@@ -23,6 +23,7 @@ module.exports = [
         TextEncoder: 'readonly',
         TextDecoder: 'readonly',
         performance: 'readonly',
+        fetch: 'readonly',
       },
     },
     rules: {

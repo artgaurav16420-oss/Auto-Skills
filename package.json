@@ -1,6 +1,6 @@
 {
   "name": "auto-skill-select",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Automatically selects and invokes the best matching skill for any task",
   "main": "scripts/skill-matcher.js",
   "bin": {
@@ -10,12 +10,21 @@
     "test": "node --test scripts/skill-matcher.test.js",
     "test:coverage": "node --experimental-test-coverage --test scripts/skill-matcher.test.js",
     "lint": "eslint scripts/ src/",
-    "start": "node scripts/skill-matcher.js"
+    "start": "node scripts/skill-matcher.js",
+    "benchmark": "node benchmark/run.js"
   },
   "private": true,
-  "keywords": ["skill", "opencode", "skill-matcher", "auto-select"],
+  "keywords": [
+    "skill",
+    "opencode",
+    "skill-matcher",
+    "auto-select"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0"
   }
 }

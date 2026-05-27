@@ -249,13 +249,30 @@ function detectProjectContext(projectDir) {
 }
 
 /**
+ * Build a skill hash to detect changes for embedding cache invalidation.
+ * @param {string} skillPath — path to SKILL.md
+ * @returns {string|null}
+ */
+function buildSkillHash(skillPath) {
+  try {
+    const content = fs.readFileSync(skillPath, 'utf8');
+    const crypto = require('crypto');
+    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Scan skill directories and write a lightweight skills index with paths.
+ * When computeEmbeddings is provided, also computes embeddings for semantic scoring.
  * @param {string} [outputPath] — path for .skills-index.json (default: cwd/.skills-index.json)
  * @param {string[]} [scanDirs] — directories to scan (default: common skill locations)
  * @param {object} [projectContext] — optional project context to embed in the index
- * @returns {Array<{name: string, description: string, path: string}>}
+ * @param {Function} [computeEmbeddings] — optional async function (desc) => number[] embedding
+ * @returns {object|Array}
  */
-function buildSkillIndex(outputPath, scanDirs, projectContext) {
+async function buildSkillIndex(outputPath, scanDirs, projectContext, computeEmbeddings) {
   const searchDirs = Array.isArray(scanDirs) && scanDirs.length > 0 ? scanDirs : getDefaultScanDirs();
   const seen = new Set();
   const index = [];
@@ -279,7 +296,16 @@ function buildSkillIndex(outputPath, scanDirs, projectContext) {
       const parsed = parseSkillFrontmatter(content);
       if (parsed && !seen.has(parsed.name)) {
         seen.add(parsed.name);
-        index.push({ name: parsed.name, description: parsed.description, path: skillPath });
+        const entry = { name: parsed.name, description: parsed.description, path: skillPath, hash: buildSkillHash(skillPath) };
+        if (typeof computeEmbeddings === 'function') {
+          try {
+            entry.embedding = await computeEmbeddings(parsed.description);
+            logger.debug(`Embedded: ${parsed.name}`);
+          } catch (err) {
+            logger.warn(`Failed to embed ${parsed.name}: ${err.message}`);
+          }
+        }
+        index.push(entry);
       }
     }
   }
@@ -296,5 +322,5 @@ module.exports = {
   isValidSkillsArray, extractSkillsFromData, isPathAllowed,
   loadSkills, parseSkillFrontmatter, walkForSubdir,
   getDefaultScanDirs, scanDirForSkills, discoverSkills,
-  detectProjectContext, buildSkillIndex
+  detectProjectContext, buildSkillIndex, buildSkillHash
 };

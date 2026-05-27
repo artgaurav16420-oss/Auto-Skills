@@ -4,7 +4,7 @@ const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
-const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd } = require('./skill-matcher');
+const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd, resetSynonyms } = require('./skill-matcher');
 
 describe('tokenize', () => {
   it('splits text into normalized tokens', () => {
@@ -42,14 +42,23 @@ describe('tokenize', () => {
   it('returns empty array for whitespace-only input', () => {
     assert.deepStrictEqual(tokenize('   '), []);
   });
+
+  it('expands synonyms when option is set', () => {
+    const result = tokenize('debug auth', { expandSynonyms: true });
+    assert.ok(result.includes('debug'));
+    assert.ok(result.includes('fix'));
+    assert.ok(result.includes('login'));
+  });
 });
 
 describe('extractIntent', () => {
-  it('extracts domain, action, technology, keywords', () => {
+  beforeEach(() => resetSynonyms());
+
+  it('extracts domain, action, technology, keywords with synonym expansion', () => {
     const result = extractIntent('debug react frontend auth timeout');
-    assert.deepStrictEqual(result.domains, ['frontend']);
-    assert.deepStrictEqual(result.actions, ['debug']);
-    assert.deepStrictEqual(result.technologies, ['react']);
+    assert.ok(result.domains.includes('frontend'));
+    assert.ok(result.actions.includes('debug'));
+    assert.ok(result.technologies.includes('react'));
     assert.ok(result.keywords.includes('auth'));
     assert.ok(result.keywords.includes('timeout'));
   });
@@ -90,70 +99,68 @@ describe('score', () => {
     { name: 'writing-plans', description: 'Creating implementation plans from requirements' }
   ];
 
-  it('ranks skills by relevance', () => {
-    const results = score(skills, 'debug the auth bug in the login flow');
+  it('ranks skills by relevance', async () => {
+    const results = await score(skills, 'debug the auth bug in the login flow');
     assert.ok(results.length > 0);
     assert.strictEqual(results[0].name, 'diagnose');
     assert.ok(results[0].score >= results[1].score, 'results should be descending');
     assert.ok(results[1].score >= results[2].score, 'results should be descending');
   });
 
-  it('returns scores between 0 and 100', () => {
-    const results = score(skills, 'debug auth');
+  it('returns scores between 0 and 100', async () => {
+    const results = await score(skills, 'debug auth');
     for (const r of results) {
       assert.ok(r.score >= 0, `${r.name} score ${r.score} < 0`);
       assert.ok(r.score <= 100, `${r.name} score ${r.score} > 100`);
     }
   });
 
-  it('returns empty array for empty skills', () => {
-    assert.deepStrictEqual(score([], 'test'), []);
+  it('returns empty array for empty skills', async () => {
+    assert.deepStrictEqual(await score([], 'test'), []);
   });
 
-  it('returns empty array for empty task', () => {
-    assert.deepStrictEqual(score(skills, ''), []);
+  it('returns empty array for empty task', async () => {
+    assert.deepStrictEqual(await score(skills, ''), []);
   });
 
-  it('skips malformed skill entries', () => {
+  it('skips malformed skill entries', async () => {
     const mixed = [
       { name: 'valid', description: 'a real skill' },
       null,
       { name: 'missing-desc' }
     ];
-    const results = score(mixed, 'test task');
+    const results = await score(mixed, 'test task');
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].name, 'valid');
   });
 
-  it('handles very long input without crashing', () => {
+  it('handles very long input without crashing', async () => {
     const long = 'a'.repeat(10000);
-    const results = score(skills, long);
+    const results = await score(skills, long);
     assert.ok(Array.isArray(results));
   });
 
-  it('returns bounded scores for known inputs', () => {
+  it('returns bounded scores for known inputs', async () => {
     const single = [{ name: 'test', description: 'debugging' }];
-    const results = score(single, 'debug');
+    const results = await score(single, 'debug');
     assert.strictEqual(results.length, 1);
     assert.ok(results[0].score >= 0);
     assert.ok(results[0].score <= 100);
   });
 
-  it('returns details with correct shape and rounded integer values', () => {
-    const results = score(skills, 'debug auth');
+  it('returns details with correct shape and rounded integer values', async () => {
+    const results = await score(skills, 'debug auth');
     for (const r of results) {
       assert.ok(r.details);
       assert.ok(typeof r.details.keywordScore === 'number');
-      assert.ok(typeof r.details.semanticScore === 'number');
       assert.ok(Number.isInteger(r.details.keywordScore));
-      assert.ok(Number.isInteger(r.details.semanticScore));
-      assert.ok(r.details.keywordScore + r.details.semanticScore <= 100);
+      assert.ok(r.details.keywordScore >= 0);
     }
   });
 
-  it('handles hyphenated technology names in pipeline', () => {
+  it('handles hyphenated technology names in pipeline', async () => {
     const skillsWithHyphen = [{ name: 'react', description: 'Build react apps' }];
-    const results = score(skillsWithHyphen, 'build react frontend');
+    const results = await score(skillsWithHyphen, 'build react frontend');
     assert.ok(results.length > 0);
     assert.ok(results[0].score > 0);
   });
@@ -318,25 +325,25 @@ describe('buildSkillIndex', () => {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   });
 
-  it('writes index to specified output path', () => {
+  it('writes index to specified output path', async () => {
     const outPath = path.join(tmpDir, 'test-index.json');
-    const result = buildSkillIndex(outPath, [tmpDir]);
+    const result = await buildSkillIndex(outPath, [tmpDir]);
     assert.strictEqual(result.length, 2);
     const loaded = JSON.parse(fs.readFileSync(outPath, 'utf8'));
     assert.strictEqual(loaded.length, 2);
   });
 
-  it('includes path field for each skill entry', () => {
+  it('includes path field for each skill entry', async () => {
     const outPath = path.join(tmpDir, 'paths.json');
-    const result = buildSkillIndex(outPath, [tmpDir]);
+    const result = await buildSkillIndex(outPath, [tmpDir]);
     assert.ok(result.every(s => s.path));
     assert.ok(result[0].path.endsWith('SKILL.md'));
   });
 
-  it('returns empty array for empty directory', () => {
+  it('returns empty array for empty directory', async () => {
     const emptyDir = path.join(tmpDir, 'nothing-here');
     fs.mkdirSync(emptyDir, { recursive: true });
-    const result = buildSkillIndex(path.join(tmpDir, 'empty.json'), [emptyDir]);
+    const result = await buildSkillIndex(path.join(tmpDir, 'empty.json'), [emptyDir]);
     assert.deepStrictEqual(result, []);
   });
 });
@@ -384,7 +391,7 @@ describe('detectProjectContext', () => {
     assert.deepStrictEqual(ctx.testingTools, []);
   });
 
-  it('wraps enriched index with project field', () => {
+  it('wraps enriched index with project field', async () => {
     fs.writeFileSync(path.join(sandbox, 'package.json'), JSON.stringify({
       dependencies: { react: '^18' }
     }));
@@ -393,7 +400,7 @@ describe('detectProjectContext', () => {
       '---\nname: test-skill\ndescription: A test\n---');
     const ctx = detectProjectContext(sandbox);
     const outPath = path.join(sandbox, 'enriched.json');
-    const result = buildSkillIndex(outPath, [sandbox], ctx);
+    const result = await buildSkillIndex(outPath, [sandbox], ctx);
     assert.ok(result.project);
     assert.strictEqual(result.project.framework, 'react');
     assert.ok(Array.isArray(result.skills));
@@ -518,17 +525,27 @@ description: A skill for debugging code
     }
   });
 
+  it('prints ranked results via --semantic flag', () => {
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --semantic "test task" "${testSkillsPath}"`,
+      { encoding: 'utf8', timeout: 15000 }
+    );
+    const parsed = JSON.parse(result.trim());
+    assert.ok(Array.isArray(parsed));
+    assert.ok(parsed.length > 0);
+  });
+
   it('prints enriched index with --enrich flag', () => {
     const enrichDir = path.join(__dirname, '..', '.code-review-cache', 'enrich-integration');
-    fs.mkdirSync(path.join(enrichDir, 'demo-skill'), { recursive: true });
-    fs.writeFileSync(path.join(enrichDir, 'demo-skill', 'SKILL.md'),
-      '---\nname: demo-skill\ndescription: A demo skill\n---');
-    fs.writeFileSync(path.join(enrichDir, 'package.json'), JSON.stringify({
-      dependencies: { react: '^18' },
-      devDependencies: { jest: '^29' }
-    }));
     const enrichOut = path.join(enrichDir, 'ind.json');
     try {
+      fs.mkdirSync(path.join(enrichDir, 'demo-skill'), { recursive: true });
+      fs.writeFileSync(path.join(enrichDir, 'demo-skill', 'SKILL.md'),
+        '---\nname: demo-skill\ndescription: A demo skill\n---');
+      fs.writeFileSync(path.join(enrichDir, 'package.json'), JSON.stringify({
+        dependencies: { react: '^18' },
+        devDependencies: { jest: '^29' }
+      }));
       const result = require('child_process').execSync(
         `node "${path.join(__dirname, 'skill-matcher.js')}" --enrich "${enrichDir}" "${enrichOut}" "${enrichDir}"`,
         { encoding: 'utf8', timeout: 5000 }

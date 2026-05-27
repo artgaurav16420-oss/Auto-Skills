@@ -40,11 +40,20 @@ function computeTokenOverlapScore(taskTokens, skillStr) {
  * Score skills against a task description.
  * Rounds keywordScore and semanticScore individually BEFORE summing
  * so that displayed_keyword + displayed_semantic === total.
+ *
+ * When useSemantic is true and a skillsIndex is provided, computes a
+ * hybrid score: 0.3 * keywordScore + 0.7 * semanticScore (both normalized to 0-100).
+ * The semantic score uses Transformer embeddings cached in the index.
+ *
  * @param {Array<{name: string, description: string}>} skills
  * @param {string} taskText
- * @returns {Array<{name: string, score: number, details: {keywordScore: number, semanticScore: number}}>}
+ * @param {object} [options]
+ * @param {boolean} [options.useSemantic=false] — enable transformer-based semantic scoring
+ * @param {object} [options.skillsIndex] — enriched index with { project, skills: [{ name, description, embedding }] }
+ * @param {Function} [options.computeSemantic] — async function (query, desc, cachedEmb) => { score, similarity }
+ * @returns {Array<{name: string, score: number, details: {keywordScore: number, semanticScore: number, similarity?: number}}>}
  */
-function score(skills, taskText) {
+async function score(skills, taskText, options) {
   if (!Array.isArray(skills) || skills.length === 0) {
     return [];
   }
@@ -57,25 +66,64 @@ function score(skills, taskText) {
   const taskTokensList = taskIntent.keywords;
   const skillToDesc = (s) => s.description.toLowerCase();
 
-  return skills.map(skill => {
+  const useSemantic = !!(options?.useSemantic && options?.computeSemantic);
+
+  // Build a lookup for cached embeddings if an index is provided
+  let embeddingMap = null;
+  if (options?.skillsIndex?.skills) {
+    embeddingMap = new Map();
+    for (const entry of options.skillsIndex.skills) {
+      if (entry.embedding) {
+        embeddingMap.set(entry.name, entry.embedding);
+      }
+    }
+  }
+
+  const results = await Promise.all(skills.map(async skill => {
     if (!skill || !skill.name || typeof skill.description !== 'string') return null;
 
     const skillTokenList = tokenize(skill.description);
     const rawKeywordScore = computeKeywordScore(taskIntent, skillTokenList);
-    const rawSemanticScore = computeTokenOverlapScore(taskTokensList, skillToDesc(skill));
+    const rawTokenOverlap = computeTokenOverlapScore(taskTokensList, skillToDesc(skill));
     const roundedKeyword = Math.round(rawKeywordScore);
-    const roundedSemantic = Math.round(rawSemanticScore);
-    const total = Math.max(0, Math.min(TOTAL_SCORE_MAX, roundedKeyword + roundedSemantic));
+    const roundedTokenOverlap = Math.round(rawTokenOverlap);
 
+    if (useSemantic) {
+      const cachedEmb = embeddingMap?.get(skill.name);
+      const semResult = await options.computeSemantic(text, skill.description, cachedEmb);
+      const rawSemScore = semResult.score;
+      const roundedSem = Math.round(rawSemScore);
+
+      // Hybrid: 0.3 * keyword (0-40 mapped to 0-100) + 0.7 * semantic (0-60 mapped to 0-100)
+      const keywordNormalized = (roundedKeyword / KEYWORD_SCORE_MAX) * 100;
+      const semNormalized = (roundedSem / SEMANTIC_SCORE_MAX) * 100;
+      const hybrid = Math.round(0.3 * keywordNormalized + 0.7 * semNormalized);
+      const total = Math.max(0, Math.min(TOTAL_SCORE_MAX, hybrid));
+
+      return {
+        name: skill.name,
+        score: total,
+        details: {
+          keywordScore: roundedKeyword,
+          semanticScore: roundedSem,
+          tokenOverlap: roundedTokenOverlap,
+          similarity: semResult.similarity !== null && semResult.similarity !== undefined ? Math.round(semResult.similarity * 1000) / 1000 : undefined
+        }
+      };
+    }
+
+    const total = Math.max(0, Math.min(TOTAL_SCORE_MAX, roundedKeyword + roundedTokenOverlap));
     return {
       name: skill.name,
       score: total,
       details: {
         keywordScore: roundedKeyword,
-        semanticScore: roundedSemantic
+        semanticScore: roundedTokenOverlap
       }
     };
-  })
+  }));
+
+  return results
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
 }
