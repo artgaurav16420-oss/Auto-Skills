@@ -4,6 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
+| 2.1.x   | ✅ Active support |
 | 2.0.x   | ✅ Active support |
 
 ## Reporting a Vulnerability
