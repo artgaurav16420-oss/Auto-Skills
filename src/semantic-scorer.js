@@ -4,29 +4,33 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { pipeline } = require('@huggingface/transformers');
 const { logger } = require('./logger');
+const { SEMANTIC_SCORE_MAX } = require('./constants');
 
 const EMBEDDING_CACHE_MAX = 500;
 
-let featureExtractor = null;
+let featureExtractorPromise = null;
 const embeddingCache = new Map();
 
 /**
  * Get or initialize the feature extraction pipeline (lazy singleton).
+ * Stores the in-flight promise to prevent concurrent parallel loads.
  * @returns {Promise<Function>} pipeline function
  */
 async function getFeatureExtractor() {
-  if (featureExtractor) return featureExtractor;
-  try {
-    logger.debug('Loading all-MiniLM-L6-v2 model...');
-    featureExtractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-      quantized: true
-    });
-    logger.debug('Model loaded successfully.');
-  } catch (err) {
-    logger.error(`Failed to load feature-extraction model: ${err.message}`);
-    throw err;
-  }
-  return featureExtractor;
+  if (featureExtractorPromise) return featureExtractorPromise;
+  featureExtractorPromise = (async () => {
+    try {
+      logger.debug('Loading all-MiniLM-L6-v2 model...');
+      const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
+      logger.debug('Model loaded successfully.');
+      return extractor;
+    } catch (err) {
+      logger.error(`Failed to load feature-extraction model: ${err.message}`);
+      featureExtractorPromise = null;
+      throw err;
+    }
+  })();
+  return featureExtractorPromise;
 }
 
 /**
@@ -55,7 +59,11 @@ function cosineSimilarity(vecA, vecB) {
  */
 async function computeEmbedding(text) {
   const cached = embeddingCache.get(text);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    embeddingCache.delete(text);
+    embeddingCache.set(text, cached);
+    return cached;
+  }
 
   const pipe = await getFeatureExtractor();
   const result = await pipe(text, { pooling: 'mean', normalize: true });
@@ -96,8 +104,8 @@ async function computeSemanticScore(query, description, cachedEmbedding) {
     const queryEmbedding = await computeEmbedding(query);
     const descEmbedding = cachedEmbedding || await computeEmbedding(description);
     const similarity = cosineSimilarity(queryEmbedding, descEmbedding);
-    const score = Math.round(similarity * 60);
-    return { score: Math.max(0, Math.min(60, score)), similarity };
+    const score = Math.round(similarity * SEMANTIC_SCORE_MAX);
+    return { score: Math.max(0, Math.min(SEMANTIC_SCORE_MAX, score)), similarity };
   } catch (err) {
     logger.debug(`computeSemanticScore error: ${err.message}`);
     return { score: 0, similarity: 0 };

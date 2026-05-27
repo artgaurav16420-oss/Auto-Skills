@@ -173,7 +173,8 @@ async function main() {
 
   if (args[0] === '--multi' || args[0] === '-m') {
     const thresholdIdx = args.indexOf('--threshold') !== -1 ? args.indexOf('--threshold') : args.indexOf('-t');
-    const threshold = thresholdIdx !== -1 ? parseInt(args[thresholdIdx + 1], 10) : 70;
+    const rawThreshold = thresholdIdx !== -1 ? parseInt(args[thresholdIdx + 1], 10) : 70;
+    const threshold = Number.isNaN(rawThreshold) ? 70 : rawThreshold;
     const nonFlagArgs = args.filter((a, i) => {
       if (a === '--multi' || a === '-m') return false;
       if (a === '--threshold' || a === '-t') return false;

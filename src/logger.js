@@ -2,6 +2,10 @@
 
 const DEBUG_ENV_VAR = 'DEBUG';
 
+/**
+ * Check whether debug logging is enabled via the DEBUG env var.
+ * @returns {boolean}
+ */
 function isDebugEnabled() {
   return process.env[DEBUG_ENV_VAR] === 'true' || process.env[DEBUG_ENV_VAR] === '1';
 }

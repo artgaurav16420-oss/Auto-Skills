@@ -9,6 +9,10 @@ const RERANK_ENDPOINT_ENV = 'LLM_RERANK_ENDPOINT';
 const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
+/**
+ * Check whether the LLM rerank environment is configured.
+ * @returns {boolean}
+ */
 const hasEnvConfig = () => {
   return !!(process.env[RERANK_API_KEY_ENV]);
 };
@@ -42,12 +46,12 @@ function buildRerankPrompt(top3, query) {
  * @returns {Promise<{name: string, source: string}>}
  */
 async function rerankWithLLM(top3, query) {
+  if (!top3 || top3.length === 0) {
+    return { name: null, source: 'fallback' };
+  }
   if (!hasEnvConfig()) {
     logger.debug('LLM_RERANK_API_KEY not set, skipping LLM rerank');
     return { name: top3[0].name, source: 'fallback' };
-  }
-  if (!top3 || top3.length === 0) {
-    return { name: null, source: 'fallback' };
   }
 
   const apiKey = process.env[RERANK_API_KEY_ENV];

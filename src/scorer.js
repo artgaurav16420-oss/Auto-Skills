@@ -3,6 +3,16 @@
 const { tokenize, extractIntent } = require('./tokenizer');
 const { KEYWORD_SCORE_MAX, SEMANTIC_SCORE_MAX, TOTAL_SCORE_MAX, MAX_INPUT_LENGTH } = require('./constants');
 
+const HYBRID_KEYWORD_WEIGHT = 0.3;
+const HYBRID_SEMANTIC_WEIGHT = 0.7;
+const SIMILARITY_ROUND_FACTOR = 1000;
+
+/**
+ * Compute the intersection of two arrays (elements present in both).
+ * @param {Array} a
+ * @param {Array} b
+ * @returns {Array}
+ */
 function intersection(a, b) {
   const setB = new Set(b);
   return a.filter(x => setB.has(x));
@@ -70,9 +80,12 @@ async function score(skills, taskText, options) {
 
   // Build a lookup for cached embeddings if an index is provided
   let embeddingMap = null;
-  if (options?.skillsIndex?.skills) {
+  const skillsList = Array.isArray(options?.skillsIndex)
+    ? options.skillsIndex
+    : options?.skillsIndex?.skills;
+  if (skillsList) {
     embeddingMap = new Map();
-    for (const entry of options.skillsIndex.skills) {
+    for (const entry of skillsList) {
       if (entry.embedding) {
         embeddingMap.set(entry.name, entry.embedding);
       }
@@ -94,10 +107,10 @@ async function score(skills, taskText, options) {
       const rawSemScore = semResult.score;
       const roundedSem = Math.round(rawSemScore);
 
-      // Hybrid: 0.3 * keyword (0-40 mapped to 0-100) + 0.7 * semantic (0-60 mapped to 0-100)
+      // Hybrid: keyword (0-40 mapped to 0-100) + semantic (0-60 mapped to 0-100)
       const keywordNormalized = (roundedKeyword / KEYWORD_SCORE_MAX) * 100;
       const semNormalized = (roundedSem / SEMANTIC_SCORE_MAX) * 100;
-      const hybrid = Math.round(0.3 * keywordNormalized + 0.7 * semNormalized);
+      const hybrid = Math.round(HYBRID_KEYWORD_WEIGHT * keywordNormalized + HYBRID_SEMANTIC_WEIGHT * semNormalized);
       const total = Math.max(0, Math.min(TOTAL_SCORE_MAX, hybrid));
 
       return {
@@ -107,7 +120,7 @@ async function score(skills, taskText, options) {
           keywordScore: roundedKeyword,
           semanticScore: roundedSem,
           tokenOverlap: roundedTokenOverlap,
-          similarity: semResult.similarity !== null && semResult.similarity !== undefined ? Math.round(semResult.similarity * 1000) / 1000 : undefined
+          similarity: semResult.similarity !== null && semResult.similarity !== undefined ? Math.round(semResult.similarity * SIMILARITY_ROUND_FACTOR) / SIMILARITY_ROUND_FACTOR : undefined
         }
       };
     }
@@ -123,9 +136,29 @@ async function score(skills, taskText, options) {
     };
   }));
 
-  return results
+  const sorted = results
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
+
+  if (options?.reranker && sorted.length >= 2) {
+    const top3 = sorted.slice(0, 3).map(r => {
+      const skill = skills.find(s => s.name === r.name);
+      return { ...r, description: skill ? skill.description : '' };
+    });
+    try {
+      const reranked = await options.reranker(top3, text);
+      if (reranked && reranked.name) {
+        const idx = sorted.findIndex(r => r.name === reranked.name);
+        if (idx > 0 && idx < 3) {
+          sorted.unshift(...sorted.splice(idx, 1));
+        }
+      }
+    } catch {
+      // reranker error is non-fatal; keep original order
+    }
+  }
+
+  return sorted;
 }
 
 module.exports = { score, computeKeywordScore, computeTokenOverlapScore, intersection };

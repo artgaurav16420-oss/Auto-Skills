@@ -78,6 +78,9 @@ function expandTokens(tokens) {
   return result;
 }
 
+/**
+ * Clear all cached tokenization results.
+ */
 function clearCache() {
   tokenizeCache.clear();
 }
@@ -85,8 +88,14 @@ function clearCache() {
 /**
  * Reset the synonyms cache (useful for testing).
  */
+/**
+ * Reset the synonyms map and clear synonym-keyed cache entries.
+ */
 function resetSynonyms() {
   synonymsMap = null;
+  for (const key of tokenizeCache.keys()) {
+    if (key.endsWith(':syn')) tokenizeCache.delete(key);
+  }
 }
 
 /**
@@ -101,7 +110,11 @@ function tokenize(text, opts) {
   if (!text || typeof text !== 'string') return [];
   const cacheKey = opts?.expandSynonyms ? text + ':syn' : text;
   const cached = tokenizeCache.get(cacheKey);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    tokenizeCache.delete(cacheKey);
+    tokenizeCache.set(cacheKey, cached);
+    return cached;
+  }
 
   let tokens = text
     .toLowerCase()

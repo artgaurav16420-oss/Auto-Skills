@@ -12,6 +12,14 @@ const SKILLS_DIR = path.join(__dirname, '..', 'data', 'benchmark-skills');
 
 const STATS_ROWS = ['total', 'passed', 'failed', 'errors'];
 const SCORE_BANDS = ['90-100', '70-89', '40-69', '0-39'];
+const TASK_PREVIEW_LENGTH = 60;
+const BAND_THRESHOLD_HIGH = 90;
+const BAND_THRESHOLD_MED = 70;
+const BAND_THRESHOLD_LOW = 40;
+const HISTOGRAM_SCALE = 50;
+const COL_WIDTH_RANK = 3;
+const COL_WIDTH_BAND = 5;
+const COL_WIDTH_TASK = 62;
 
 function loadBenchmarkSkills() {
   if (fs.existsSync(SKILLS_DIR)) {
@@ -96,14 +104,19 @@ async function runBenchmark() {
     clearCache();
     try {
       const ranked = await score(skills, task);
-      const top = ranked[0] || { name: '(none)', score: 0 };
-      const band = bandFor(top.score);
-      results.byBand[band]++;
-      results.perTask.push({ task: task.slice(0, 60), best: top.name, score: top.score, band });
-      results.stats.passed++;
+      if (!ranked || ranked.length === 0 || ranked[0].name === '(none)') {
+        results.stats.failed++;
+        results.perTask.push({ task: task.slice(0, TASK_PREVIEW_LENGTH), best: '(none)', score: 0, band: '0-39' });
+      } else {
+        const top = ranked[0];
+        const band = bandFor(top.score);
+        results.byBand[band]++;
+        results.perTask.push({ task: task.slice(0, TASK_PREVIEW_LENGTH), best: top.name, score: top.score, band });
+        results.stats.passed++;
+      }
     } catch (err) {
       results.stats.errors++;
-      results.perTask.push({ task: task.slice(0, 60), best: '(error)', score: 0, band: '0-39', error: err.message });
+      results.perTask.push({ task: task.slice(0, TASK_PREVIEW_LENGTH), best: '(error)', score: 0, band: '0-39', error: err.message });
     }
     results.stats.total++;
   }
@@ -112,9 +125,9 @@ async function runBenchmark() {
 }
 
 function bandFor(score) {
-  if (score >= 90) return '90-100';
-  if (score >= 70) return '70-89';
-  if (score >= 40) return '40-69';
+  if (score >= BAND_THRESHOLD_HIGH) return '90-100';
+  if (score >= BAND_THRESHOLD_MED) return '70-89';
+  if (score >= BAND_THRESHOLD_LOW) return '40-69';
   return '0-39';
 }
 
@@ -123,15 +136,15 @@ function printResults(results, totalTasks) {
   for (const band of SCORE_BANDS) {
     const count = results.byBand[band];
     const pct = ((count / totalTasks) * 100).toFixed(1);
-    const bar = '█'.repeat(Math.round(count / totalTasks * 50));
+    const bar = '█'.repeat(Math.round(count / totalTasks * HISTOGRAM_SCALE));
     console.log(`  ${band}: ${String(count).padStart(3)} (${pct}%) ${bar}`);
   }
 
   console.log('\nTop Matches per Task:');
   for (const r of results.perTask) {
-    const scoreStr = String(r.score).padStart(3);
-    const bandStr = r.band.padEnd(5);
-    const taskStr = r.task.padEnd(62);
+    const scoreStr = String(r.score).padStart(COL_WIDTH_RANK);
+    const bandStr = r.band.padEnd(COL_WIDTH_BAND);
+    const taskStr = r.task.padEnd(COL_WIDTH_TASK);
     console.log(`  ${scoreStr} [${bandStr}] ${taskStr} → ${r.best}`);
     if (r.error) {
       console.log(`       ⚠ ${r.error}`);

@@ -5,14 +5,20 @@ const { tokenize, extractIntent, clearCache, resetSynonyms, loadSynonyms } = req
 const { loadSkills, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext } = require('./scanner');
 const { setupAgentsMd } = require('./setup');
 const { createReranker } = require('./reranker');
+const { logger } = require('./logger');
 
 let _semantic = null;
 function getSemantic() {
   if (!_semantic) {
     try {
       _semantic = require('./semantic-scorer');
-    } catch {
-      _semantic = { computeSemanticScore: null, computeEmbedding: null, cosineSimilarity: null, computeSkillHash: null };
+    } catch (err) {
+      if (err.code === 'MODULE_NOT_FOUND') {
+        logger.warn('semantic-scorer not available; semantic features disabled.');
+        _semantic = { computeSemanticScore: null, computeEmbedding: null, cosineSimilarity: null, computeSkillHash: null };
+      } else {
+        throw err;
+      }
     }
   }
   return _semantic;

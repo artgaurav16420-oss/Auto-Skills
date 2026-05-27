@@ -8,10 +8,20 @@ const { logger } = require('./logger');
 
 const SECURE_BASE_DIR = fs.realpathSync(path.resolve(process.cwd()));
 
+/**
+ * Check whether data is a valid array of skill entries.
+ * @param {*} data
+ * @returns {boolean}
+ */
 function isValidSkillsArray(data) {
   return Array.isArray(data) && data.every(s => s && s.name && typeof s.description === 'string');
 }
 
+/**
+ * Extract a valid skills array from data (either plain array or { skills } envelope).
+ * @param {*} data
+ * @returns {Array<{name: string, description: string}>|null}
+ */
 function extractSkillsFromData(data) {
   if (isValidSkillsArray(data)) return data;
   if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(data.skills)) {
@@ -20,6 +30,11 @@ function extractSkillsFromData(data) {
   return null;
 }
 
+/**
+ * Check that a resolved path is within the secure base directory.
+ * @param {string} targetPath
+ * @returns {boolean}
+ */
 function isPathAllowed(targetPath) {
   const resolved = fs.realpathSync(targetPath);
   const relative = path.relative(SECURE_BASE_DIR, resolved);
@@ -39,7 +54,8 @@ function loadSkills(customPath) {
         return [];
       }
       const resolvedPath = path.resolve(customPath);
-      if (!isPathAllowed(resolvedPath)) {
+      const isExplicitAbsolute = path.isAbsolute(customPath);
+      if (!isExplicitAbsolute && !isPathAllowed(resolvedPath)) {
         logger.warn(`loadSkills: path traversal blocked for ${customPath}`);
         return [];
       }
@@ -82,9 +98,33 @@ function parseSkillFrontmatter(content) {
   if (!match) return null;
   const yaml = match[1];
   const name = yaml.match(/^name:\s*(.+)$/m);
-  const description = yaml.match(/^description:\s*(.+)$/m);
-  if (!name || !description) return null;
-  return { name: name[1].trim(), description: description[1].trim() };
+  if (!name) return null;
+
+  const lines = yaml.split('\n');
+  let description = null;
+  for (let i = 0; i < lines.length; i++) {
+    const descLine = lines[i].match(/^description:\s*(.*)$/);
+    if (!descLine) continue;
+    description = descLine[1].trim();
+    if (description === '' || /^[|>][-+]?$/.test(description)) {
+      const parts = [];
+      for (let j = i + 1; j < lines.length; j++) {
+        const trimmed = lines[j].trim();
+        if (trimmed === '' || lines[j].startsWith(' ') || lines[j].startsWith('\t')) {
+          if (trimmed !== '' || (j + 1 < lines.length && (lines[j + 1].startsWith(' ') || lines[j + 1].startsWith('\t')))) {
+            parts.push(trimmed);
+          }
+        } else {
+          break;
+        }
+      }
+      description = parts.join(' ').trim();
+    }
+    break;
+  }
+
+  if (!description) return null;
+  return { name: name[1].trim(), description };
 }
 
 /**
@@ -100,6 +140,7 @@ function walkForSubdir(root, target) {
     const entries = fs.readdirSync(root, { withFileTypes: true });
     for (const e of entries) {
       if (!e.isDirectory()) continue;
+      if (e.name === 'node_modules' || e.name === '.git') continue;
       const full = path.join(root, e.name);
       const candidate = path.join(full, target);
       if (fs.existsSync(candidate)) {
@@ -114,6 +155,10 @@ function walkForSubdir(root, target) {
   return results;
 }
 
+/**
+ * Get the default directories to scan for skills.
+ * @returns {string[]}
+ */
 function getDefaultScanDirs() {
   const dirs = [
     path.join(os.homedir(), '.agents', 'skills'),
