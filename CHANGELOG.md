@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.1.0] - 2026-05-27
+
+### Added
+- Modular source structure: `src/tokenizer.js`, `src/scorer.js`, `src/scanner.js`, `src/setup.js`, `src/index.js`
+- Structured logging with `[auto-skills:level]` prefix, respects `DEBUG` env variable
+- `--validate` CLI command to check SKILL.md validity (frontmatter, paths, required fields)
+- `docs/skill-authoring.md` — guide for writing descriptions that score well
+- LRU eviction policy on tokenizeCache (max 1000 entries) to prevent unbounded memory growth
+- `clearCache()` exported function for cache management
+
+### Fixed
+- Hardcoded Windows paths (`C:\Users\INP\...`) replaced with `~/.agents/skills/...` in SKILL.md
+- Rounding inconsistency in `score()` — keyword and semantic scores are now rounded individually *before* summing, so `displayed_keyword + displayed_semantic === total`
+- `walkForSubdir` empty `catch {}` — now logs debug messages via structured logger
+- Documentation test counts updated from 30/46 to 55 across CONTRIBUTING.md and README.md
+
+### Changed
+- `console.warn` replaced with `logger.warn` throughout the codebase
+- Tokenize cache now uses LRU eviction instead of unbounded growth
+- `score()` rounds component scores before summation for consistency
+
+### Refactored
+- `scripts/skill-matcher.js` now imports from `src/index.js` — thin CLI wrapper
+- All exported functions maintain the same public API for backward compatibility
+
 ## [1.0.0] - 2026-05-26
 
 ### Added

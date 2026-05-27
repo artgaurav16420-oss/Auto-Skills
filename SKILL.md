@@ -49,8 +49,8 @@ After setup, this check won't trigger again.
 Always load these three skills immediately (read their SKILL.md files from the paths below):
 
 ```
-caveman       → C:\Users\INP\.agents\skills\caveman\SKILL.md
-karpathy-guidelines → C:\Users\INP\.agents\skills\karpathy-guidelines\SKILL.md
+caveman       → ~/.agents/skills/caveman/SKILL.md
+karpathy-guidelines → ~/.agents/skills/karpathy-guidelines/SKILL.md
 ```
 
 Superpowers discipline is already in the system prompt — acknowledge it, don't re-read.

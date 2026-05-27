@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, beforeEach, afterEach, mock } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
@@ -544,5 +544,77 @@ description: A skill for debugging code
     } finally {
       try { fs.rmSync(enrichDir, { recursive: true, force: true }); } catch {}
     }
+  });
+});
+
+describe('validate (--validate CLI)', () => {
+  const sandbox = path.join(__dirname, '..', '.code-review-cache', 'test-validate');
+
+  beforeEach(() => {
+    fs.mkdirSync(path.join(sandbox, 'valid-skill'), { recursive: true });
+    fs.writeFileSync(path.join(sandbox, 'valid-skill', 'SKILL.md'), `---
+name: valid-skill
+description: A valid skill for testing
+---
+`);
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(sandbox, { recursive: true, force: true }); } catch {}
+  });
+
+  it('reports valid for a correct SKILL.md', () => {
+    const skillPath = path.join(sandbox, 'valid-skill', 'SKILL.md');
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${skillPath}"`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const parsed = JSON.parse(result.trim());
+    assert.strictEqual(parsed.valid, true);
+  });
+
+  it('reports invalid for missing SKILL.md', () => {
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${path.join(sandbox, 'nonexistent', 'SKILL.md')}"`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const parsed = JSON.parse(result.trim());
+    assert.strictEqual(parsed.valid, false);
+    assert.ok(parsed.issues.length > 0);
+  });
+
+  it('reports invalid for SKILL.md without name field', () => {
+    const badDir = path.join(sandbox, 'bad-skill');
+    fs.mkdirSync(badDir, { recursive: true });
+    fs.writeFileSync(path.join(badDir, 'SKILL.md'), `---
+description: missing name field
+---
+`);
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${path.join(badDir, 'SKILL.md')}"`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const parsed = JSON.parse(result.trim());
+    assert.strictEqual(parsed.valid, false);
+  });
+
+  it('prints error when no path given', () => {
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --validate`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const parsed = JSON.parse(result.trim());
+    assert.ok(parsed.error);
+  });
+});
+
+describe('clearCache', () => {
+  const { clearCache, tokenize } = require('./skill-matcher');
+
+  it('clears tokenize cache without breaking tokenize', () => {
+    tokenize('hello world');
+    clearCache();
+    const result = tokenize('hello world');
+    assert.deepStrictEqual(result, ['hello', 'world']);
   });
 });
