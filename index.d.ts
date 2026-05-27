@@ -2,6 +2,8 @@ export interface Skill {
   name: string;
   description: string;
   path?: string;
+  hash?: string;
+  embedding?: number[];
 }
 
 export interface ScoreResult {
