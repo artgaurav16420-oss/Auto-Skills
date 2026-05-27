@@ -358,16 +358,16 @@ async function buildSkillIndex(outputPath, scanDirs, projectContext, computeEmbe
       const parsed = parseSkillFrontmatter(content);
       if (parsed && !seen.has(parsed.name)) {
         seen.add(parsed.name);
-        const entry = { name: parsed.name, description: parsed.description, path: skillPath, hash: buildSkillHash(skillPath) };
+        const indexEntry = { name: parsed.name, description: parsed.description, path: skillPath, hash: buildSkillHash(skillPath) };
         if (typeof computeEmbeddings === 'function') {
           try {
-            entry.embedding = await computeEmbeddings(parsed.description);
+            indexEntry.embedding = await computeEmbeddings(parsed.description);
             logger.debug(`Embedded: ${parsed.name}`);
           } catch (err) {
             logger.warn(`Failed to embed ${parsed.name}: ${err.message}`);
           }
         }
-        index.push(entry);
+        index.push(indexEntry);
       }
     }
   }
