@@ -4,7 +4,7 @@ const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
-const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd, resetSynonyms } = require('./skill-matcher');
+const { score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd, resetSynonyms, loadCatalog } = require('./skill-matcher');
 
 describe('tokenize', () => {
   it('splits text into normalized tokens', () => {

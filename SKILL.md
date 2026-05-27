@@ -103,10 +103,7 @@ If the index is enriched with project context, boost scores for skills whose des
 
 | Score | Action |
 |-------|--------|
-| > 90 | **Single auto-invoke**. One skill dominates — load it alone. Read its SKILL.md, follow its instructions. Announce: "Using [skill] for [purpose]" |
-| 70-90 | **Multi auto-invoke**. Load ALL skills in this range. Read each SKILL.md, merge their guidance contextually. Announce: "Using [skills] for [purpose]" listing each one |
-| 40-70 | **Prompt user**: "These skills might help: [top 2-3]. Which should I use?" |
-| < 40 | **No match → suggest install**. Reason from task intent what skill would help. Name it, describe what it does, and explain why it fits. Ask if they want to find or create it. Then proceed with base layer only. |
+| > 90 | **Single auto-invoke**. One skill dominates — load it alone. Read its SKILL.md, follow its instructions. Announce: \"Using [skill] for [purpose]\" |\n| 70-90 | **Multi auto-invoke**. Load ALL skills in this range. Read each SKILL.md, merge their guidance contextually. Announce: \"Using [skills] for [purpose]\" listing each one |\n| 40-69 | **Prompt user**: \"These skills might help: [top 2-3]. Which should I use?\" |\n| < 40 | **No match → suggest install**. Read `data/known-skills.json` for a curated catalog of installable skills. Match task intent against catalog entries. Name the best-fit skill, describe what it does, show the install command from its `install` field, and ask if they want to proceed. Then proceed with base layer only. |
 
 **Multi-skill merging rule:** When loading multiple skills, apply their guidance as complementary layers. If they conflict, the higher-scored skill's guidance takes precedence. Do not load skills whose guidance is a subset of another loaded skill (e.g., TDD and test-driven-development).
 
@@ -157,6 +154,9 @@ node scripts/skill-matcher.js --index
 # Build enriched index with project context detection (reads package.json, etc.)
 node scripts/skill-matcher.js --enrich
 
+# View the known-skills catalog of installable skills
+node scripts/skill-matcher.js --catalog
+
 # Multi-skill mode: return all skills above threshold (default: 70)
 node scripts/skill-matcher.js --multi "build a react dashboard" ./skills-index.json
 
@@ -170,8 +170,7 @@ node scripts/skill-matcher.js --multi --threshold 60 "debug login flow" ./skills
 - **Re-run on every task change.** Detect task switches by parsing user messages — new domain, action, or technology signals a shift. On task change, skip step 0 (index still valid) and step 1 (base layer still loaded); re-run from step 2.
 - On session start, run full workflow (steps 0-6). On mid-session task switch, run steps 2-6 only.
 - Always load Caveman + Karpathy Guidelines + Superpowers first — they are non-negotiable on every task.
-- After base layer, find all task-specific skills scoring >70 and load the top results (multi if 70-90, single if >90).
-- If multiple task-specific skills score >70, load all of them (deduplicating aliases). If multiple score >90, only the highest.
+- After base layer, find all task-specific skills scoring >=70 and load the top results (multi if all are 70-90, single if the highest is >90).\n- If the highest-scoring skill is >90, load only that single skill. If no skill is >90 but multiple skills score 70-90, load all of them (deduplicating aliases).
 - If a skill was already loaded, don't reload. Just apply its rules.
 - Never skip this workflow because you "know what the task is." Surface assumptions first.
 - If `.skills-index.json` is missing or stale, ask the user to run `--index` to regenerate it.

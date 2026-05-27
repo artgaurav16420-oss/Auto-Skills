@@ -65,6 +65,15 @@ function printMultiScore(taskText, customPath, threshold) {
   });
 }
 
+function loadCatalog() {
+  const CATALOG_PATH = path.join(__dirname, '..', 'data', 'known-skills.json');
+  try {
+    return JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
 function validateSkill(skillPath) {
   const issues = [];
   try {
@@ -246,14 +255,13 @@ async function main() {
     return;
   }
 
-  if (args[0] === '--catalog') {
-    const knownSkillsPath = path.join(__dirname, '..', 'data', 'known-skills.json');
-    try {
-      const catalog = JSON.parse(fs.readFileSync(knownSkillsPath, 'utf8'));
-      console.log(JSON.stringify(catalog, null, 2));
-    } catch {
-      console.log(JSON.stringify({ error: 'known-skills.json not found' }));
+  if (args[0] === '--catalog' || args[0] === '-c') {
+    const catalog = loadCatalog();
+    if (catalog.length === 0) {
+      console.log('Catalog not found or empty.');
+      return;
     }
+    console.log(JSON.stringify(catalog, null, 2));
     return;
   }
 
@@ -267,5 +275,5 @@ if (require.main === module) main().catch(err => {
 module.exports = {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache, resetSynonyms, loadSynonyms
+  clearCache, resetSynonyms, loadSynonyms, loadCatalog
 };
