@@ -90,6 +90,13 @@ describe('extractIntent', () => {
     const result = extractIntent('the and of');
     assert.deepStrictEqual(result, { domains: [], actions: [], technologies: [], keywords: [] });
   });
+
+  it('does not double-count tokens across categories after synonym expansion', () => {
+    const result = extractIntent('debug security');
+    const allTokens = [...result.domains, ...result.actions, ...result.technologies, ...result.keywords];
+    const unique = new Set(allTokens);
+    assert.strictEqual(allTokens.length, unique.size, 'No token should appear in multiple categories');
+  });
 });
 
 describe('score', () => {
@@ -112,6 +119,13 @@ describe('score', () => {
     for (const r of results) {
       assert.ok(r.score >= 0, `${r.name} score ${r.score} < 0`);
       assert.ok(r.score <= 100, `${r.name} score ${r.score} > 100`);
+    }
+  });
+
+  it('score stays bounded with synonym-rich input (no double-count inflation)', async () => {
+    const results = await score(skills, 'debug fix test security database');
+    for (const r of results) {
+      assert.ok(r.score >= 0 && r.score <= 100, `${r.name} score ${r.score} out of bounds`);
     }
   });
 
@@ -597,10 +611,15 @@ description: A valid skill for testing
   });
 
   it('reports invalid for missing SKILL.md', () => {
-    const result = require('child_process').execSync(
-      `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${path.join(sandbox, 'nonexistent', 'SKILL.md')}"`,
-      { encoding: 'utf8', timeout: 5000 }
-    );
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${path.join(sandbox, 'nonexistent', 'SKILL.md')}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stdout;
+    }
     const parsed = JSON.parse(result.trim());
     assert.strictEqual(parsed.valid, false);
     assert.ok(parsed.issues.length > 0);
@@ -613,10 +632,15 @@ description: A valid skill for testing
 description: missing name field
 ---
 `);
-    const result = require('child_process').execSync(
-      `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${path.join(badDir, 'SKILL.md')}"`,
-      { encoding: 'utf8', timeout: 5000 }
-    );
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${path.join(badDir, 'SKILL.md')}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stdout;
+    }
     const parsed = JSON.parse(result.trim());
     assert.strictEqual(parsed.valid, false);
   });

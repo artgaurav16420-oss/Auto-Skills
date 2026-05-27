@@ -149,6 +149,7 @@ async function main() {
       console.log(JSON.stringify({ valid: true, message: 'Skill is valid' }));
     } else {
       console.log(JSON.stringify({ valid: false, issues: result.issues }));
+      process.exit(1);
     }
     return;
   }
