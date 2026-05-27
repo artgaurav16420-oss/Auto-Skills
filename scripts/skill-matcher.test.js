@@ -97,6 +97,20 @@ describe('extractIntent', () => {
     const unique = new Set(allTokens);
     assert.strictEqual(allTokens.length, unique.size, 'No token should appear in multiple categories');
   });
+
+  it('synonym expansion does not inflate action count', () => {
+    const result = extractIntent('debug react');
+    assert.strictEqual(result.actions.length, 1);
+    assert.ok(result.actions.includes('debug'));
+    assert.ok(!result.actions.includes('fix'),
+      'synonym of action should not appear in actions');
+  });
+
+  it('keyword pool includes synonym expansions for recall', () => {
+    const result = extractIntent('debug');
+    assert.ok(result.keywords.includes('diagnose'));
+    assert.ok(result.keywords.includes('troubleshoot'));
+  });
 });
 
 describe('score', () => {
@@ -731,5 +745,38 @@ describe('scorer internals', () => {
     it('score never exceeds 60', () => {
       assert.strictEqual(computeTokenOverlapScore(['a', 'b', 'c'], 'a b c'), 60);
     });
+  });
+});
+
+describe('isPathAllowed (security)', () => {
+  const { isPathAllowed } = require('../src/scanner');
+  const os = require('os');
+
+  it('allows paths within cwd', () => {
+    const allowed = path.join(process.cwd(), 'data', 'known-skills.json');
+    assert.strictEqual(isPathAllowed(allowed), true);
+  });
+
+  it('allows paths within home .agents directory', () => {
+    const allowed = path.join(os.homedir(), '.agents', 'skills', 'test.json');
+    assert.strictEqual(isPathAllowed(allowed), true);
+  });
+
+  it('allows paths within home .claude directory', () => {
+    const allowed = path.join(os.homedir(), '.claude', 'skills', 'my-skill', 'SKILL.md');
+    assert.strictEqual(isPathAllowed(allowed), true);
+  });
+
+  it('blocks /etc/passwd', () => {
+    assert.strictEqual(isPathAllowed('/etc/passwd'), false);
+  });
+
+  it('blocks path traversal via ../../', () => {
+    const traversal = path.join(process.cwd(), '..', '..', '..', '..', 'etc', 'passwd');
+    assert.strictEqual(isPathAllowed(traversal), false);
+  });
+
+  it('blocks /tmp/../etc/passwd style traversal', () => {
+    assert.strictEqual(isPathAllowed('/tmp/../etc/passwd'), false);
   });
 });
