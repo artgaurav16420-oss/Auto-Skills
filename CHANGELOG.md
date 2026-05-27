@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.2.0] - 2026-05-27
+
+### Fixed
+- `extractIntent()` — synonym expansion no longer inflates
+  `domains`/`actions`/`technologies` counts. Intent classification
+  now uses raw tokens only; synonym-expanded tokens go to `keywords`
+  for broader token overlap recall. Fixes scoring ceiling bug where
+  tasks with purely technical descriptions could only reach 40/100.
+- `parseSkillFrontmatter()` — CRLF line endings now normalized to LF
+  before parsing, fixing SKILL.md discovery on Windows.
+- `isPathAllowed()` — extended allowlist now covers `~/.agents`,
+  `~/.config/opencode`, `~/.claude`, `~/.cache`, and `os.tmpdir()`.
+  Absolute paths to outside these roots are blocked (previously only
+  relative paths were checked).
+
+### Added
+- `data/benchmark-skills/` — three reference skills (`debug-skill`,
+  `test-skill`, `deploy-skill`) shipped with the repo so
+  `npm run benchmark` runs against real data out of the box.
+- CI smoke test: `--validate SKILL.md` (must pass) and
+  `--validate package.json` (must exit 1) run on every push/PR.
+- `index.d.ts` — `Skill` interface now includes `hash?: string` and
+  `embedding?: number[]` fields matching actual `buildSkillIndex` output.
+
+### Security
+- `isPathAllowed()` now applied to ALL `loadSkills` inputs regardless
+  of whether the path is absolute or relative, closing a bypass where
+  absolute paths (e.g. `/etc/passwd`) were never checked.
+
+### Tests
+- 8 new tests: 2 for `extractIntent` synonym inflation, 6 for
+  `isPathAllowed` allowlist and block cases.
+- Total: 85 tests, all passing.
+
 ## [2.1.0] - 2026-05-27
 
 ### Added
