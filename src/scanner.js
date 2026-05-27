@@ -6,16 +6,24 @@ const os = require('os');
 
 const { logger } = require('./logger');
 
-const SECURE_BASE_DIR = fs.realpathSync(path.resolve(process.cwd()));
+let _secureBaseDir = null;
+function getSecureBaseDir() {
+  if (!_secureBaseDir) {
+    _secureBaseDir = fs.realpathSync(path.resolve(process.cwd()));
+  }
+  return _secureBaseDir;
+}
 
-const ALLOWED_ROOTS = [
-  SECURE_BASE_DIR,
-  path.join(os.homedir(), '.agents'),
-  path.join(os.homedir(), '.config', 'opencode'),
-  path.join(os.homedir(), '.claude'),
-  path.join(os.homedir(), '.cache'),
-  os.tmpdir()
-];
+function getAllowedRoots() {
+  return [
+    getSecureBaseDir(),
+    path.join(os.homedir(), '.agents'),
+    path.join(os.homedir(), '.config', 'opencode'),
+    path.join(os.homedir(), '.claude'),
+    path.join(os.homedir(), '.cache'),
+    os.tmpdir()
+  ];
+}
 
 /**
  * Check whether data is a valid array of skill entries.
@@ -51,7 +59,7 @@ function isPathAllowed(targetPath) {
   } catch {
     resolved = path.resolve(targetPath);
   }
-  return ALLOWED_ROOTS.some(root => {
+  return getAllowedRoots().some(root => {
     const rel = path.relative(root, resolved);
     return !rel.startsWith('..') && !path.isAbsolute(rel);
   });
@@ -114,7 +122,7 @@ function parseSkillFrontmatter(content) {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) return null;
   const yaml = match[1];
-  const name = yaml.match(/^name:\s*(.+)$/m);
+  const name = yaml.match(/^name:[ \t]*(.+)$/m);
   if (!name) return null;
 
   const lines = yaml.split('\n');

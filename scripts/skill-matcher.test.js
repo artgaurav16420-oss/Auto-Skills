@@ -57,9 +57,9 @@ describe('extractIntent', () => {
   it('extracts domain, action, technology, keywords with synonym expansion', () => {
     const result = extractIntent('debug react frontend auth timeout');
     assert.ok(result.domains.includes('frontend'));
+    assert.ok(result.domains.includes('auth'));
     assert.ok(result.actions.includes('debug'));
     assert.ok(result.technologies.includes('react'));
-    assert.ok(result.keywords.includes('auth'));
     assert.ok(result.keywords.includes('timeout'));
   });
 
@@ -596,6 +596,31 @@ description: A skill for debugging code
       try { fs.rmSync(enrichDir, { recursive: true, force: true }); } catch {}
     }
   });
+
+  it('prints results via --rerank flag (fallback mode)', () => {
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --rerank "test task" "${testSkillsPath}"`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const lines = result.split(/\r?\n/);
+    const startIdx = lines.findIndex(l => l.trim() === '[');
+    const endIdx = lines.findIndex(l => l.trim() === ']');
+    assert.ok(startIdx !== -1 && endIdx !== -1, 'output should contain JSON array');
+    const jsonStr = lines.slice(startIdx, endIdx + 1).join('\n');
+    const parsed = JSON.parse(jsonStr);
+    assert.ok(Array.isArray(parsed));
+    assert.ok(parsed.length > 0);
+    assert.strictEqual(parsed[0].name, 'test');
+  });
+
+  it('shows error when --rerank has no task', () => {
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --rerank`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const parsed = JSON.parse(result.trim());
+    assert.ok(parsed.error);
+  });
 });
 
 describe('validate (--validate CLI)', () => {
@@ -748,6 +773,120 @@ describe('scorer internals', () => {
   });
 });
 
+describe('reranker', () => {
+  const { createReranker, rerankWithLLM, hasEnvConfig, buildRerankPrompt } = require('../src/reranker');
+
+  describe('hasEnvConfig', () => {
+    it('returns false when LLM_RERANK_API_KEY is not set', () => {
+      const prev = process.env.LLM_RERANK_API_KEY;
+      delete process.env.LLM_RERANK_API_KEY;
+      assert.strictEqual(hasEnvConfig(), false);
+      if (prev) process.env.LLM_RERANK_API_KEY = prev;
+    });
+
+    it('returns true when LLM_RERANK_API_KEY is set', () => {
+      const prev = process.env.LLM_RERANK_API_KEY;
+      process.env.LLM_RERANK_API_KEY = 'test-key';
+      assert.strictEqual(hasEnvConfig(), true);
+      if (prev) process.env.LLM_RERANK_API_KEY = prev; else delete process.env.LLM_RERANK_API_KEY;
+    });
+  });
+
+  describe('buildRerankPrompt', () => {
+    it('formats prompt with top3 skills and query', () => {
+      const top3 = [
+        { name: 'debug', score: 85, description: 'Debugging skill' },
+        { name: 'test', score: 72, description: 'Testing skill' }
+      ];
+      const prompt = buildRerankPrompt(top3, 'fix login bug');
+      assert.ok(prompt.includes('Task: fix login bug'));
+      assert.ok(prompt.includes('1. debug (score: 85)'));
+      assert.ok(prompt.includes('2. test (score: 72)'));
+    });
+
+    it('handles single candidate gracefully', () => {
+      const prompt = buildRerankPrompt([{ name: 'debug', score: 85, description: 'Debug' }], 'test');
+      assert.ok(prompt.includes('1. debug'));
+      assert.ok(prompt.includes('Candidates'));
+    });
+  });
+
+  describe('rerankWithLLM', () => {
+    let originalFetch;
+
+    beforeEach(() => { originalFetch = global.fetch; });
+    afterEach(() => { global.fetch = originalFetch; });
+
+    it('returns fallback for empty top3', async () => {
+      const result = await rerankWithLLM([], 'test');
+      assert.deepStrictEqual(result, { name: null, source: 'fallback' });
+    });
+
+    it('returns fallback when no API key set', async () => {
+      const prev = process.env.LLM_RERANK_API_KEY;
+      delete process.env.LLM_RERANK_API_KEY;
+      const result = await rerankWithLLM([{ name: 'debug', score: 85, description: 'Debug' }], 'test');
+      assert.deepStrictEqual(result, { name: 'debug', source: 'fallback' });
+      if (prev) process.env.LLM_RERANK_API_KEY = prev;
+    });
+
+    it('returns llm-chosen skill when fetch succeeds', async () => {
+      process.env.LLM_RERANK_API_KEY = 'test-key';
+      global.fetch = async () => ({
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'debug' } }] })
+      });
+      const result = await rerankWithLLM([{ name: 'debug', score: 85, description: 'Debug' }], 'test');
+      assert.strictEqual(result.name, 'debug');
+      assert.strictEqual(result.source, 'llm');
+      delete process.env.LLM_RERANK_API_KEY;
+    });
+
+    it('falls back when API returns non-ok status', async () => {
+      process.env.LLM_RERANK_API_KEY = 'test-key';
+      global.fetch = async () => ({ ok: false, status: 500 });
+      const result = await rerankWithLLM([{ name: 'debug', score: 85, description: 'Debug' }], 'test');
+      assert.strictEqual(result.name, 'debug');
+      assert.strictEqual(result.source, 'fallback');
+      delete process.env.LLM_RERANK_API_KEY;
+    });
+
+    it('falls back when API returns non-matching skill name', async () => {
+      process.env.LLM_RERANK_API_KEY = 'test-key';
+      global.fetch = async () => ({
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'nonexistent' } }] })
+      });
+      const result = await rerankWithLLM([{ name: 'debug', score: 85, description: 'Debug' }], 'test');
+      assert.strictEqual(result.name, 'debug');
+      assert.strictEqual(result.source, 'fallback');
+      delete process.env.LLM_RERANK_API_KEY;
+    });
+
+    it('falls back when fetch throws', async () => {
+      process.env.LLM_RERANK_API_KEY = 'test-key';
+      global.fetch = async () => { throw new Error('network error'); };
+      const result = await rerankWithLLM([{ name: 'debug', score: 85, description: 'Debug' }], 'test');
+      assert.strictEqual(result.name, 'debug');
+      assert.strictEqual(result.source, 'fallback');
+      delete process.env.LLM_RERANK_API_KEY;
+    });
+  });
+
+  describe('createReranker', () => {
+    it('returns rerankWithLLM by default', () => {
+      const { rerank } = createReranker();
+      assert.strictEqual(rerank, rerankWithLLM);
+    });
+
+    it('uses custom rerank function when provided', () => {
+      const custom = async () => ({ name: 'custom', source: 'custom' });
+      const { rerank } = createReranker(custom);
+      assert.strictEqual(rerank, custom);
+    });
+  });
+});
+
 describe('isPathAllowed (security)', () => {
   const { isPathAllowed } = require('../src/scanner');
   const os = require('os');
@@ -778,5 +917,189 @@ describe('isPathAllowed (security)', () => {
 
   it('blocks /tmp/../etc/passwd style traversal', () => {
     assert.strictEqual(isPathAllowed('/tmp/../etc/passwd'), false);
+  });
+});
+
+describe('semantic-scorer', () => {
+  const { cosineSimilarity, computeSkillHash, computeSemanticScore } = require('../src/index');
+
+  describe('cosineSimilarity', () => {
+    it('returns 1 for identical vectors', () => {
+      assert.strictEqual(cosineSimilarity([1, 0], [1, 0]), 1);
+    });
+
+    it('returns 0 for orthogonal vectors', () => {
+      assert.strictEqual(cosineSimilarity([1, 0], [0, 1]), 0);
+    });
+
+    it('returns 0 for mismatched lengths', () => {
+      assert.strictEqual(cosineSimilarity([1, 0], [1]), 0);
+    });
+
+    it('returns 0 for zero vector', () => {
+      assert.strictEqual(cosineSimilarity([0, 0], [1, 0]), 0);
+    });
+
+    it('returns value between 0 and 1 for partial similarity', () => {
+      const sim = cosineSimilarity([1, 1], [1, 0]);
+      assert.ok(sim > 0 && sim < 1);
+    });
+
+    it('handles negative values correctly', () => {
+      const sim = cosineSimilarity([1, 0], [-1, 0]);
+      assert.strictEqual(sim, -1);
+    });
+  });
+
+  describe('computeSkillHash', () => {
+    it('returns 64-char hex hash for existing file', () => {
+      const hash = computeSkillHash(path.join(process.cwd(), 'SKILL.md'));
+      assert.strictEqual(typeof hash, 'string');
+      assert.strictEqual(hash.length, 64);
+    });
+
+    it('returns null for missing file', () => {
+      assert.strictEqual(computeSkillHash('/nonexistent/file.md'), null);
+    });
+  });
+
+  describe('computeSemanticScore', () => {
+    it('returns a score between 0 and 60 without crashing', async () => {
+      const result = await computeSemanticScore('fix login bug', 'debugging skill');
+      assert.ok(result.score >= 0);
+      assert.ok(result.score <= 60);
+      assert.ok(typeof result.similarity === 'number');
+    });
+  });
+});
+
+describe('scanner uncovered paths', () => {
+  const { extractSkillsFromData, buildSkillHash, loadSkills } = require('../src/scanner');
+
+  describe('extractSkillsFromData', () => {
+    it('extracts from { skills: [...] } envelope', () => {
+      const data = { project: { language: 'node' }, skills: [{ name: 'test', description: 'testing' }] };
+      const result = extractSkillsFromData(data);
+      assert.ok(result);
+      assert.strictEqual(result.length, 1);
+      assert.strictEqual(result[0].name, 'test');
+    });
+
+    it('returns null for envelope with invalid skills array', () => {
+      const data = { project: {}, skills: [{ name: 'test' }] };
+      assert.strictEqual(extractSkillsFromData(data), null);
+    });
+
+    it('returns null for envelope with non-array skills', () => {
+      const data = { project: {}, skills: 'invalid' };
+      assert.strictEqual(extractSkillsFromData(data), null);
+    });
+
+    it('returns null for plain object without skills key', () => {
+      const data = { some: 'data' };
+      assert.strictEqual(extractSkillsFromData(data), null);
+    });
+
+    it('returns null for null input', () => {
+      assert.strictEqual(extractSkillsFromData(null), null);
+    });
+  });
+
+  describe('buildSkillHash', () => {
+    it('returns 16-char hash for existing file', () => {
+      const hash = buildSkillHash(path.join(process.cwd(), 'SKILL.md'));
+      assert.strictEqual(typeof hash, 'string');
+      assert.strictEqual(hash.length, 16);
+    });
+
+    it('returns null for missing file', () => {
+      assert.strictEqual(buildSkillHash('/nonexistent/SKILL.md'), null);
+    });
+  });
+
+  describe('loadSkills with envelope', () => {
+    const scratchDir = path.join(process.cwd(), '.code-review-cache');
+    const envelopeFile = path.join(scratchDir, 'test-envelope-skills.json');
+
+    beforeEach(() => {
+      try { fs.mkdirSync(scratchDir, { recursive: true }); } catch {}
+    });
+    afterEach(() => {
+      try { fs.unlinkSync(envelopeFile); } catch {}
+    });
+
+    it('loads skills from { skills: [...] } envelope file', () => {
+      fs.writeFileSync(envelopeFile, JSON.stringify({ project: { language: 'node' }, skills: [{ name: 'env-test', description: 'test skill from envelope' }] }));
+      const skills = loadSkills(envelopeFile);
+      assert.strictEqual(skills.length, 1);
+      assert.strictEqual(skills[0].name, 'env-test');
+    });
+
+    it('returns empty array for envelope file with invalid inner array', () => {
+      fs.writeFileSync(envelopeFile, JSON.stringify({ project: {}, skills: [{ name: 'bad' }] }));
+      const skills = loadSkills(envelopeFile);
+      assert.strictEqual(skills.length, 0);
+    });
+  });
+});
+
+describe('validateSkill', () => {
+  const { validateSkill } = require('./skill-matcher');
+  const scratchDir = path.join(process.cwd(), '.code-review-cache');
+  const tempSkillFile = path.join(scratchDir, 'SKILL.md');
+
+  beforeEach(() => {
+    try { fs.mkdirSync(scratchDir, { recursive: true }); } catch {}
+  });
+  afterEach(() => {
+    try { fs.unlinkSync(tempSkillFile); } catch {}
+  });
+
+  it('returns valid for a well-formed SKILL.md', () => {
+    const result = validateSkill(path.join(process.cwd(), 'SKILL.md'));
+    assert.strictEqual(result.valid, true);
+  });
+
+  it('returns invalid for non-existent path', () => {
+    const result = validateSkill('/nonexistent/SKILL.md');
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.issues.length > 0);
+  });
+
+  it('returns invalid for non-SKILL.md file name', () => {
+    const result = validateSkill(path.join(process.cwd(), 'package.json'));
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.issues.some(i => i.includes('SKILL.md')));
+  });
+
+  it('returns invalid for missing name field', () => {
+    const content = '---\n---\nSome content';
+    fs.writeFileSync(tempSkillFile, content, 'utf8');
+    const result = validateSkill(tempSkillFile);
+    assert.strictEqual(result.valid, false);
+  });
+
+  it('returns invalid for whitespace-only name field', () => {
+    const content = '---\nname:   \ndescription: test\n---\nContent';
+    fs.writeFileSync(tempSkillFile, content, 'utf8');
+    const result = validateSkill(tempSkillFile);
+    assert.strictEqual(result.valid, false);
+  });
+
+  it('returns invalid when frontmatter is missing', () => {
+    fs.writeFileSync(tempSkillFile, 'Just content without frontmatter', 'utf8');
+    const result = validateSkill(tempSkillFile);
+    assert.strictEqual(result.valid, false);
+  });
+});
+
+describe('loadCatalog', () => {
+  const { loadCatalog } = require('./skill-matcher');
+
+  it('returns array of catalog entries', () => {
+    const catalog = loadCatalog();
+    assert.ok(Array.isArray(catalog));
+    assert.ok(catalog.length > 0);
+    assert.ok(catalog.every(e => e.name && e.description));
   });
 });

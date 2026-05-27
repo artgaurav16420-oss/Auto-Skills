@@ -26,3 +26,13 @@ jobs:
         run: |
           node scripts/skill-matcher.js --validate SKILL.md
           node scripts/skill-matcher.js --validate package.json && exit 1 || true
+      - name: Smoke test --semantic
+        env:
+          SKILLS_JSON: '[{"name":"test","description":"debugging skill"}]'
+        run: |
+          timeout 30 node scripts/skill-matcher.js --semantic "test task" && echo "OK" || echo "SKIP (model download may fail)"
+      - name: Smoke test --rerank
+        env:
+          SKILLS_JSON: '[{"name":"test","description":"debugging skill"}]'
+        run: |
+          node scripts/skill-matcher.js --rerank "test task" && echo "OK"

@@ -7,19 +7,28 @@ const { MAX_LRU_CACHE_SIZE } = require('./constants');
 
 const DOMAIN_KEYWORDS = new Set([
   'frontend', 'backend', 'testing', 'design', 'data', 'docs', 'devops',
-  'config', 'database', 'network', 'security', 'mobile', 'cli', 'api'
+  'config', 'database', 'network', 'security', 'mobile', 'cli', 'api',
+  'ui', 'ux', 'auth', 'monitoring', 'analytics', 'infra',
+  'architecture', 'accessibility', 'automation', 'compliance',
+  'performance', 'logging'
 ]);
 
 const ACTION_KEYWORDS = new Set([
   'create', 'fix', 'migrate', 'refactor', 'debug', 'optimize', 'test', 'tests',
   'deploy', 'build', 'add', 'remove', 'update', 'rename', 'configure',
-  'write', 'implement', 'make', 'setup'
+  'write', 'implement', 'make', 'setup',
+  'analyze', 'audit', 'validate', 'investigate',
+  'automate', 'generate', 'integrate', 'restructure', 'consolidate',
+  'review', 'clean'
 ]);
 
 const TECH_KEYWORDS = new Set([
   'react', 'typescript', 'python', 'docker', 'supabase', 'node',
   'javascript', 'css', 'html', 'rust', 'go', 'java', 'ruby', 'postgres',
-  'sql', 'vue', 'angular', 'svelte', 'next', 'nuxt'
+  'sql', 'vue', 'angular', 'svelte', 'next', 'nuxt',
+  'aws', 'gcp', 'azure', 'prisma', 'graphql', 'redis', 'tailwind',
+  'express', 'nest', 'mongodb', 'mysql', 'django', 'flask', 'kubernetes',
+  'jest', 'playwright', 'stripe', 'trpc', 'vite', 'deno', 'bun'
 ]);
 
 const STOP_WORDS = new Set([

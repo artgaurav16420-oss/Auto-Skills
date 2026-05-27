@@ -258,6 +258,28 @@ async function main() {
     return;
   }
 
+  if (args[0] === '--rerank' || args[0] === '-r') {
+    const taskText = args[1];
+    const customPath = args[2];
+    if (!taskText) {
+      console.log(JSON.stringify({ error: 'Task text required after --rerank' }));
+      return;
+    }
+    const skills = loadSkills(customPath);
+    if (skills.length === 0) {
+      console.log('No skills loaded. Provide SKILLS_JSON env var or pass a JSON file path as second argument.');
+      return;
+    }
+    const { hasEnvConfig } = require('../src/reranker');
+    if (!hasEnvConfig()) {
+      console.log('Warning: LLM_RERANK_API_KEY not set. Reranker will use fallback (returns top scorer).');
+    }
+    const { rerank } = require('../src/index').createReranker();
+    const results = await score(skills, taskText, { reranker: rerank });
+    console.log(JSON.stringify(results, null, 2));
+    return;
+  }
+
   if (args[0] === '--catalog' || args[0] === '-c') {
     const catalog = loadCatalog();
     if (catalog.length === 0) {
@@ -278,5 +300,6 @@ if (require.main === module) main().catch(err => {
 module.exports = {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache, resetSynonyms, loadSynonyms, loadCatalog
+  clearCache, resetSynonyms, loadSynonyms, loadCatalog,
+  validateSkill
 };
