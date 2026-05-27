@@ -195,7 +195,7 @@ The skill auto-activates via `activate_skill` in the session lifecycle.
 
 ## 📚 API Reference
 
-All exported functions have JSDoc annotations and are fully tested (77 tests, all passing).
+All exported functions have JSDoc annotations and are fully tested (85 tests, all passing).
 
 ### `score(skills, taskText)`
 
@@ -221,10 +221,14 @@ Extracts structured intent from task text.
 
 ```js
 extractIntent('debug react auth timeout')
-// → { domains: ['frontend'],
-//     actions: ['debug'],
+// → { domains:      [],
+//     actions:      ['debug'],
 //     technologies: ['react'],
-//     keywords: ['auth', 'timeout'] }
+//     keywords:     ['auth', 'timeout', 'diagnose',
+//                    'troubleshoot', 'trace', 'authentication',
+//                    'login', 'oauth', 'authorization'] }
+// domains/actions/tech use original tokens only;
+// keywords include synonym expansions for broader recall.
 ```
 
 ### `loadSkills(customPath?)`
@@ -257,22 +261,22 @@ discoverSkills(['./custom/skills'])  // → scan specific directories only
 
 ---
 
-## 🤝 Contributing
+## ## 🤝 Contributing
 
-We ❤️ pull requests.
+We ❤️ pull requests — but please follow these guidelines:
 
-1. **Discuss first** — open an issue before implementing
-2. **Write tests** — run `npm test`, keep all 77 green
-3. **Follow conventions** — [Conventional Commits](https://www.conventionalcommits.org/), JSDoc on all exports
-4. **Zero runtime deps policy** — optionalDependencies allowed with discussion
+1. **Discuss first** — open a GitHub issue before starting work. No blind PRs.
+2. **Surgical changes** — touch only what the issue requires. No scope creep.
+3. **Tests must pass** — run `npm test`, keep all 85 green.
+4. **JSDoc all exports** — every public function needs a JSDoc block.
+5. **Conventional Commits** — `feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`.
+6. **Zero runtime deps** — no new npm dependencies without discussion in the issue.
 
 ```bash
 git clone https://github.com/artgaurav16420-oss/Auto-Skills.git
 cd auto-skill-select
-npm test                              # 77 tests, all green
-node scripts/skill-matcher.js "..."   # manual smoke test
+npm test                    # 85 tests, all green
 ```
-
 ---
 
 ## 🏗️ Project Structure
@@ -294,7 +298,7 @@ auto-skill-select/
 │   └── auto-skill-hook.ts
 ├── scripts/
 │   ├── skill-matcher.js        # thin CLI wrapper
-│   └── skill-matcher.test.js   # 77 tests
+│   └── skill-matcher.test.js   # 85 tests
 ├── src/
 │   ├── constants.js
 │   ├── index.js
