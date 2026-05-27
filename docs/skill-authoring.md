@@ -23,7 +23,7 @@ description: A concise description of what this skill does
 The hybrid scoring engine evaluates your skill's description against the user's task:
 
 1. **Keyword Score (0-40):** Matches domain, action, and technology keywords from your description against the task.
-2. **Semantic Score (0-60):** Broader word-boundary matching of remaining keywords.
+2. **Semantic Score (0-60):** Broader word-boundary matching of all task tokens plus synonym expansions against the skill description.
 3. **Total (0-100):** Rounded sum with detailed breakdown.
 
 ## Writing Descriptions That Score Well
