@@ -1,3 +1,4 @@
 .code-review-cache/
 .skills-index.json
 node_modules/
+plugins/dist/

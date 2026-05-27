@@ -86,9 +86,6 @@ function clearCache() {
 }
 
 /**
- * Reset the synonyms cache (useful for testing).
- */
-/**
  * Reset the synonyms map and clear synonym-keyed cache entries.
  */
 function resetSynonyms() {

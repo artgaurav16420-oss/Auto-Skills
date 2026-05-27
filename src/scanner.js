@@ -8,6 +8,15 @@ const { logger } = require('./logger');
 
 const SECURE_BASE_DIR = fs.realpathSync(path.resolve(process.cwd()));
 
+const ALLOWED_ROOTS = [
+  SECURE_BASE_DIR,
+  path.join(os.homedir(), '.agents'),
+  path.join(os.homedir(), '.config', 'opencode'),
+  path.join(os.homedir(), '.claude'),
+  path.join(os.homedir(), '.cache'),
+  os.tmpdir()
+];
+
 /**
  * Check whether data is a valid array of skill entries.
  * @param {*} data
@@ -31,14 +40,21 @@ function extractSkillsFromData(data) {
 }
 
 /**
- * Check that a resolved path is within the secure base directory.
+ * Check that a resolved path is within any allowed root directory.
  * @param {string} targetPath
  * @returns {boolean}
  */
 function isPathAllowed(targetPath) {
-  const resolved = fs.realpathSync(targetPath);
-  const relative = path.relative(SECURE_BASE_DIR, resolved);
-  return !relative.startsWith('..') && !path.isAbsolute(relative);
+  let resolved;
+  try {
+    resolved = fs.realpathSync(targetPath);
+  } catch {
+    resolved = path.resolve(targetPath);
+  }
+  return ALLOWED_ROOTS.some(root => {
+    const rel = path.relative(root, resolved);
+    return !rel.startsWith('..') && !path.isAbsolute(rel);
+  });
 }
 
 /**
@@ -54,8 +70,7 @@ function loadSkills(customPath) {
         return [];
       }
       const resolvedPath = path.resolve(customPath);
-      const isExplicitAbsolute = path.isAbsolute(customPath);
-      if (!isExplicitAbsolute && !isPathAllowed(resolvedPath)) {
+      if (!isPathAllowed(resolvedPath)) {
         logger.warn(`loadSkills: path traversal blocked for ${customPath}`);
         return [];
       }
@@ -172,9 +187,9 @@ function getDefaultScanDirs() {
   try {
     const found = walkForSubdir(cacheBase, path.join('node_modules', 'superpowers', 'skills'));
     dirs.push(...found);
-  } catch {
-    // root directory may not exist
-  }
+    } catch (err) {
+      logger.debug(`scanDirForSkills: cannot read dir — ${err.message}`);
+    }
   return dirs;
 }
 
@@ -182,7 +197,8 @@ function scanDirForSkills(dir, seen, collector) {
   let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
+  } catch (err) {
+    logger.debug(`scanDirForSkills: cannot read ${dir} — ${err.message}`);
     return;
   }
   for (const entry of entries) {
@@ -191,7 +207,8 @@ function scanDirForSkills(dir, seen, collector) {
     let content;
     try {
       content = fs.readFileSync(skillPath, 'utf8');
-    } catch {
+    } catch (err) {
+      logger.debug(`scanDirForSkills: cannot read ${skillPath} — ${err.message}`);
       continue;
     }
     const parsed = parseSkillFrontmatter(content);

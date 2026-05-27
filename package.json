@@ -3,6 +3,7 @@
   "version": "2.0.0",
   "description": "Automatically selects and invokes the best matching skill for any task",
   "main": "scripts/skill-matcher.js",
+  "types": "index.d.ts",
   "bin": {
     "skill-matcher": "./scripts/skill-matcher.js"
   },
@@ -11,7 +12,9 @@
     "test:coverage": "node --experimental-test-coverage --test scripts/skill-matcher.test.js",
     "lint": "eslint scripts/ src/",
     "start": "node scripts/skill-matcher.js",
-    "benchmark": "node benchmark/run.js"
+    "benchmark": "node benchmark/run.js",
+    "build:plugin": "tsc -p tsconfig.plugin.json",
+    "prepublishOnly": "npm run build:plugin"
   },
   "private": true,
   "keywords": [
@@ -24,7 +27,11 @@
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {
+  "optionalDependencies": {
     "@huggingface/transformers": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3"
   }
 }

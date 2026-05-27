@@ -4,9 +4,9 @@
 </picture>
 
 <p align="center">
-   <img src="https://img.shields.io/badge/tests-55%2F55-brightgreen?style=flat-square&logo=vitest" alt="Tests">
+   <img src="https://img.shields.io/badge/tests-75%2F75-brightgreen?style=flat-square&logo=vitest" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js" alt="Node">
-  <img src="https://img.shields.io/badge/dependencies-0-success?style=flat-square" alt="Dependencies">
+  <img src="https://img.shields.io/badge/dependencies-0%20required-success?style=flat-square" alt="Dependencies">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/OpenCode-ready-6366f1?style=flat-square" alt="OpenCode">
   <img src="https://img.shields.io/badge/Claude%20Code-ready-6366f1?style=flat-square" alt="Claude Code">
@@ -28,7 +28,7 @@ Built for developers who want their AI tools to be **proactive**, not reactive.
 | Icon | Feature | Why It Matters |
 |------|---------|---------------|
 | 🧠 | **Smart Matching** — hybrid 0-100 scoring (keyword overlap + semantic relevance) | Picks the right skill even when your description is vague |
-| ⚡ | **Zero Dependencies** — pure Node.js, no `node_modules` bloat | Installs in under a second |
+| ⚡ | **Zero Required Runtime Dependencies** — pure Node.js, `@huggingface/transformers` optional for semantic mode | No `node_modules` bloat for basic usage |
 | 🔌 | **Multi-Platform** — OpenCode, Claude Code, Gemini CLI | One setup, works everywhere |
 | 🧪 | **Deterministic CLI** — offline pre-scoring tool | Test and debug skill matching without an LLM |
 | 🛡️ | **Secure by Default** — path traversal protection, no telemetry, no network calls | Your code never leaves your machine |
@@ -195,7 +195,7 @@ The skill auto-activates via `activate_skill` in the session lifecycle.
 
 ## 📚 API Reference
 
-All exported functions have JSDoc annotations and are fully tested (55 tests, all passing).
+All exported functions have JSDoc annotations and are fully tested (75 tests, all passing).
 
 ### `score(skills, taskText)`
 
@@ -262,14 +262,14 @@ discoverSkills(['./custom/skills'])  // → scan specific directories only
 We ❤️ pull requests.
 
 1. **Discuss first** — open an issue before implementing
-2. **Write tests** — run `npm test`, keep all 55 green
+2. **Write tests** — run `npm test`, keep all 75 green
 3. **Follow conventions** — [Conventional Commits](https://www.conventionalcommits.org/), JSDoc on all exports
-4. **Zero deps policy** — no new dependencies without discussion
+4. **Zero runtime deps policy** — optionalDependencies allowed with discussion
 
 ```bash
 git clone https://github.com/artgaurav16420-oss/Auto-Skills.git
 cd auto-skill-select
-npm test                              # 55 tests, all green
+npm test                              # 75 tests, all green
 node scripts/skill-matcher.js "..."   # manual smoke test
 ```
 
@@ -279,15 +279,38 @@ node scripts/skill-matcher.js "..."   # manual smoke test
 
 ```
 auto-skill-select/
-├── .github/workflows/ci.yml     # CI (Node 18, 20, 22)
-├── assets/banner.svg             # README banner
+├── .github/workflows/ci.yml
+├── assets/banner.svg
+├── benchmark/
+│   ├── run.js
+│   └── tasks.json
+├── data/
+│   ├── known-skills.json
+│   └── synonyms.json
+├── docs/
+│   ├── llm-rerank.md
+│   └── skill-authoring.md
+├── plugins/
+│   └── auto-skill-hook.ts
 ├── scripts/
-│   ├── skill-matcher.js         # CLI + library (248 LOC)
-│   └── skill-matcher.test.js    # 46 tests
-├── SKILL.md                     # Agent workflow instructions
-├── README.md                    # You are here
-├── CHANGELOG.md                 # v1.0.0
-└── package.json                 # Zero dependencies
+│   ├── skill-matcher.js        # thin CLI wrapper
+│   └── skill-matcher.test.js   # 75 tests
+├── src/
+│   ├── constants.js
+│   ├── index.js
+│   ├── logger.js
+│   ├── reranker.js
+│   ├── scanner.js
+│   ├── scorer.js
+│   ├── semantic-scorer.js
+│   ├── setup.js
+│   └── tokenizer.js
+├── AGENTS.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── eslint.config.js
+├── package.json
+└── SKILL.md
 ```
 
 ---
@@ -297,7 +320,7 @@ auto-skill-select/
   <br/>
   <strong>OpenCode</strong> · <strong>Claude Code</strong> · <strong>Gemini CLI</strong>
   <br/>
-  <sub>MIT © 2026 · Zero dependencies · 660 LOC · 55 passing tests</sub>
+  <sub>MIT © 2026 · Zero required dependencies · 660 LOC · 75 passing tests</sub>
   <br/>
   <sub>
     <a href="#top">Back to top</a>

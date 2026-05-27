@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const crypto = require('crypto');
-const { pipeline } = require('@huggingface/transformers');
 const { logger } = require('./logger');
 const { SEMANTIC_SCORE_MAX } = require('./constants');
 
@@ -20,6 +19,7 @@ async function getFeatureExtractor() {
   if (featureExtractorPromise) return featureExtractorPromise;
   featureExtractorPromise = (async () => {
     try {
+      const { pipeline } = require('@huggingface/transformers');
       logger.debug('Loading all-MiniLM-L6-v2 model...');
       const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
       logger.debug('Model loaded successfully.');

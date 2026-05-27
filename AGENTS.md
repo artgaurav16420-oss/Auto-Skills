@@ -5,7 +5,7 @@ Zero-dependency Node.js skill router. Scans `SKILL.md` frontmatter, scores skill
 ## Commands
 
 ```bash
-npm test                             # 46 tests, uses node:test (not jest/vitest)
+npm test                             # 75 tests, uses node:test (not jest/vitest)
 npm run test:coverage                # --experimental-test-coverage
 node scripts/skill-matcher.js        # interactive mode
 node scripts/skill-matcher.js <task> [skills.json]

@@ -73,7 +73,12 @@ async function score(skills, taskText, options) {
   const text = taskText.length > MAX_INPUT_LENGTH ? taskText.slice(0, MAX_INPUT_LENGTH) : taskText;
 
   const taskIntent = extractIntent(text);
-  const taskTokensList = taskIntent.keywords;
+  const taskTokensList = [...new Set([
+    ...taskIntent.domains,
+    ...taskIntent.actions,
+    ...taskIntent.technologies,
+    ...taskIntent.keywords
+  ])];
   const skillToDesc = (s) => s.description.toLowerCase();
 
   const useSemantic = !!(options?.useSemantic && options?.computeSemantic);

@@ -153,6 +153,8 @@ function printResults(results, totalTasks) {
 
   console.log(`\nSummary:`);
   console.log(`  Total:  ${results.stats.total}`);
+  console.log(`  Passed: ${results.stats.passed}`);
+  console.log(`  Failed: ${results.stats.failed}`);
   console.log(`  Errors: ${results.stats.errors}`);
 }
 

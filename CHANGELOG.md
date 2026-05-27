@@ -25,7 +25,7 @@
 - `scripts/skill-matcher.js` now imports from `src/index.js` — thin CLI wrapper
 - All exported functions maintain the same public API for backward compatibility
 
-## [2.0.0] - 2026-05-27
+## [2.1.0] - 2026-05-27
 
 ### Added
 - **Semantic scoring** via `@huggingface/transformers` — `--semantic` CLI flag loads a Transformer model for dense embedding computation

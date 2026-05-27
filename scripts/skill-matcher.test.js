@@ -641,3 +641,71 @@ describe('clearCache', () => {
     assert.deepStrictEqual(result, ['hello', 'world']);
   });
 });
+
+describe('scorer internals', () => {
+  const { computeKeywordScore, computeTokenOverlapScore, intersection } = require('../src/scorer');
+
+  describe('intersection', () => {
+    it('returns elements present in both arrays', () => {
+      assert.deepStrictEqual(intersection(['a', 'b', 'c'], ['b', 'd', 'e']), ['b']);
+    });
+
+    it('returns empty array when no overlap', () => {
+      assert.deepStrictEqual(intersection(['a', 'b'], ['c', 'd']), []);
+    });
+
+    it('handles duplicates in input correctly', () => {
+      assert.deepStrictEqual(intersection(['a', 'a', 'b'], ['a', 'c']), ['a', 'a']);
+    });
+  });
+
+  describe('computeKeywordScore', () => {
+    it('returns 0 when taskIntent has no domain/action/tech', () => {
+      const intent = { domains: [], actions: [], technologies: [], keywords: ['foo'] };
+      assert.strictEqual(computeKeywordScore(intent, ['foo', 'bar']), 0);
+    });
+
+    it('returns KEYWORD_SCORE_MAX (40) when all intent tokens match skill tokens', () => {
+      const intent = { domains: ['frontend'], actions: ['debug'], technologies: ['react'], keywords: [] };
+      assert.strictEqual(computeKeywordScore(intent, ['frontend', 'debug', 'react']), 40);
+    });
+
+    it('returns proportional score for partial match', () => {
+      const intent = { domains: ['frontend'], actions: ['debug'], technologies: ['react'], keywords: [] };
+      const score = computeKeywordScore(intent, ['frontend', 'react']);
+      assert.strictEqual(score, 40 * (2 / 3));
+    });
+
+    it('returns 0 when skill tokens empty', () => {
+      const intent = { domains: ['backend'], actions: ['fix'], technologies: ['python'], keywords: [] };
+      assert.strictEqual(computeKeywordScore(intent, []), 0);
+    });
+
+    it('score never exceeds 40', () => {
+      const intent = { domains: ['frontend', 'backend'], actions: ['debug', 'fix'], technologies: ['react', 'python'], keywords: [] };
+      assert.ok(computeKeywordScore(intent, ['frontend', 'backend', 'debug', 'fix', 'react', 'python']) <= 40);
+    });
+  });
+
+  describe('computeTokenOverlapScore', () => {
+    it('returns 0 for empty task tokens', () => {
+      assert.strictEqual(computeTokenOverlapScore([], 'any skill description'), 0);
+    });
+
+    it('returns SEMANTIC_SCORE_MAX (60) for full match', () => {
+      assert.strictEqual(computeTokenOverlapScore(['debug', 'login'], 'debug login'), 60);
+    });
+
+    it('partial match returns proportional score', () => {
+      assert.strictEqual(computeTokenOverlapScore(['debug', 'login', 'bug'], 'debug login'), 40);
+    });
+
+    it('word boundary matching: "test" does not match "testing"', () => {
+      assert.strictEqual(computeTokenOverlapScore(['test'], 'unit testing framework'), 0);
+    });
+
+    it('score never exceeds 60', () => {
+      assert.strictEqual(computeTokenOverlapScore(['a', 'b', 'c'], 'a b c'), 60);
+    });
+  });
+});
