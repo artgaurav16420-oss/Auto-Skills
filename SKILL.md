@@ -188,7 +188,7 @@ Caveman, Karpathy Guidelines, and Superpowers are **meta-skills** that apply to 
 - **Karpathy** prevents overcomplication, scope creep, and silent assumptions
 - **Superpowers** ensures no relevant skill is missed
 
-They cost ~0 added context because they're already in the prompt or trivially small.
+They cost ~0 added context because they're loaded via opencode.jsonc instructions or trivially small. Caveman is always-active — it applies its compression rules to every response unless the user explicitly disables it.
 
 ## Utility
 
