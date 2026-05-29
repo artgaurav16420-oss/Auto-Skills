@@ -49,6 +49,18 @@ describe('tokenize', () => {
     assert.ok(result.includes('fix'));
     assert.ok(result.includes('login'));
   });
+
+  it('evicts oldest cache entry when cache exceeds limit', () => {
+    const { clearCache } = require('./skill-matcher');
+    clearCache();
+    const maxSize = 1000;
+    for (let i = 0; i < maxSize + 1; i++) {
+      tokenize(`unique-string-${i}-${Date.now()}-${Math.random()}`);
+    }
+    const result = tokenize('hello world');
+    assert.deepStrictEqual(result, ['hello', 'world']);
+    clearCache();
+  });
 });
 
 describe('extractIntent', () => {
@@ -571,6 +583,41 @@ describe('setupOpencodeJsonc', () => {
     );
     assert.ok(out.includes('Updated'));
   });
+
+  it('returns error status for unparseable JSON', () => {
+    const fakePath = path.join(sandbox, 'opencode-broken.jsonc');
+    fs.writeFileSync(fakePath, '{broken json}', 'utf8');
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --setup-opencode "${fakePath}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stdout;
+    }
+    assert.ok(result.includes('Manual setup required'));
+  });
+});
+
+describe('loadCatalog edge cases', () => {
+  const { loadCatalog } = require('./skill-matcher');
+  const CATALOG_PATH = require('path').join(__dirname, '..', 'data', 'known-skills.json');
+
+  it('returns empty array when catalog file is missing', () => {
+    const origPath = CATALOG_PATH;
+    const backup = origPath + '.bak';
+    try {
+      if (require('fs').existsSync(origPath)) {
+        require('fs').renameSync(origPath, backup);
+      }
+      assert.deepStrictEqual(loadCatalog(), []);
+    } finally {
+      if (require('fs').existsSync(backup)) {
+        require('fs').renameSync(backup, origPath);
+      }
+    }
+  });
 });
 
 describe('main (CLI entry point)', () => {
@@ -706,6 +753,79 @@ description: A skill for debugging code
     );
     const parsed = JSON.parse(result.trim());
     assert.ok(parsed.error);
+  });
+
+  it('--multi returns results above threshold', () => {
+    const tempSkills = path.join(__dirname, '..', '.code-review-cache', 'multi-skills.json');
+    try {
+      fs.writeFileSync(tempSkills, JSON.stringify([
+        { name: 'skill-a', description: 'debugging and fixing bugs in code' },
+        { name: 'skill-b', description: 'writing documentation and guides' }
+      ]), 'utf8');
+      const result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --multi --threshold 10 "debug the code" "${tempSkills}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      const parsed = JSON.parse(result.trim());
+      assert.ok(parsed.count > 0);
+      assert.ok(parsed.threshold, 10);
+    } finally {
+      try { fs.unlinkSync(tempSkills); } catch {}
+    }
+  });
+
+  it('--multi with no task prints error', () => {
+    const result = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --multi`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    const parsed = JSON.parse(result.trim());
+    assert.ok(parsed.error);
+  });
+
+  it('--enrich with no package.json prints plain index', () => {
+    const enrichDir = path.join(__dirname, '..', '.code-review-cache', 'enrich-noctx');
+    const enrichOut = path.join(enrichDir, 'noctx.json');
+    try {
+      fs.mkdirSync(path.join(enrichDir, 'bare-skill'), { recursive: true });
+      fs.writeFileSync(path.join(enrichDir, 'bare-skill', 'SKILL.md'),
+        '---\nname: bare-skill\ndescription: A bare skill\n---');
+      const result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --enrich "${enrichDir}" "${enrichOut}" "${enrichDir}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      assert.ok(result.includes('project context'));
+    } finally {
+      try { fs.rmSync(enrichDir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  it('--semantic with no task prints error', () => {
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --semantic`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stdout;
+    }
+    const parsed = JSON.parse(result.trim());
+    assert.ok(parsed.error);
+  });
+
+  it('batch mode with empty skills file prints "No skills loaded"', () => {
+    const emptyPath = path.join(__dirname, '..', '.code-review-cache', 'empty-skills.json');
+    try {
+      fs.writeFileSync(emptyPath, '[]', 'utf8');
+      const result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" "test task" "${emptyPath}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      assert.ok(result.includes('No skills loaded'));
+    } finally {
+      try { fs.unlinkSync(emptyPath); } catch {}
+    }
   });
 });
 
@@ -856,6 +976,52 @@ describe('scorer internals', () => {
     it('score never exceeds 60', () => {
       assert.strictEqual(computeTokenOverlapScore(['a', 'b', 'c'], 'a b c'), 60);
     });
+  });
+});
+
+describe('score integration', () => {
+  const { score } = require('./skill-matcher');
+
+  it('builds embedding map from enriched index and uses semantic score', async () => {
+    const skills = [{ name: 'test', description: 'testing skill for validation' }];
+    const computeSemantic = async (q, desc, cachedEmb) => {
+      assert.ok(cachedEmb);
+      assert.deepStrictEqual(cachedEmb, [0.1, 0.2]);
+      return { score: 30, similarity: 0.5 };
+    };
+    const skillsIndex = { project: { language: 'node', framework: null, libraries: [], testingTools: [] }, skills: [{ name: 'test', description: 'testing skill for validation', embedding: [0.1, 0.2] }] };
+    const results = await score(skills, 'test validation', { useSemantic: true, computeSemantic, skillsIndex });
+    assert.ok(results.length > 0);
+    assert.strictEqual(results[0].name, 'test');
+  });
+
+  it('reranker promotes second-place candidate to first', async () => {
+    const skills = [
+      { name: 'alpha', description: 'Fix database queries and optimize SQL' },
+      { name: 'beta', description: 'Write documentation and API guides' },
+      { name: 'gamma', description: 'Design UI components and layouts' }
+    ];
+    let captured;
+    const customReranker = async (top3) => {
+      captured = top3.map(s => s.name);
+      return { name: top3[1].name };
+    };
+    const results = await score(skills, 'fix the database query', { reranker: customReranker });
+    assert.ok(captured);
+    // alpha should be #1 (matches 'fix', 'database'), reranker picks #2 (beta)
+    // beta should move to front after reorder
+    assert.strictEqual(captured[0], 'alpha');
+    assert.strictEqual(results[0].name, 'beta');
+  });
+
+  it('reranker error does not break scoring — retains original order', async () => {
+    const skills = [
+      { name: 'top', description: 'top matching skill for debugging' },
+      { name: 'bottom', description: 'unrelated' }
+    ];
+    const brokenReranker = async () => { throw new Error('rerank fail'); };
+    const results = await score(skills, 'debug top skill', { reranker: brokenReranker });
+    assert.strictEqual(results[0].name, 'top');
   });
 });
 
@@ -1060,7 +1226,154 @@ describe('semantic-scorer', () => {
 });
 
 describe('scanner uncovered paths', () => {
-  const { extractSkillsFromData, buildSkillHash, loadSkills } = require('../src/scanner');
+  const { extractSkillsFromData, buildSkillHash, loadSkills, walkForSubdir, getDefaultScanDirs, buildSkillIndex, detectProjectContext } = require('../src/scanner');
+  const os = require('os');
+  const scratchDir = path.join(process.cwd(), '.code-review-cache');
+
+  describe('walkForSubdir', () => {
+    const wfsDir = path.join(scratchDir, 'test-walkforsubdir');
+
+    beforeEach(() => {
+      fs.mkdirSync(path.join(wfsDir, 'sub-a', 'nested'), { recursive: true });
+      fs.writeFileSync(path.join(wfsDir, 'sub-a', 'target.txt'), 'found');
+      fs.mkdirSync(path.join(wfsDir, 'sub-b'), { recursive: true });
+      fs.writeFileSync(path.join(wfsDir, 'sub-b', 'target.txt'), 'found');
+      fs.mkdirSync(path.join(wfsDir, 'empty-dir'), { recursive: true });
+    });
+
+    afterEach(() => {
+      try { fs.rmSync(wfsDir, { recursive: true, force: true }); } catch {}
+    });
+
+    it('finds target files in nested subdirectories', () => {
+      const results = walkForSubdir(wfsDir, 'target.txt');
+      assert.strictEqual(results.length, 2);
+      assert.ok(results.every(r => r.endsWith('target.txt')));
+    });
+
+    it('skips node_modules and .git directories', () => {
+      fs.mkdirSync(path.join(wfsDir, 'node_modules', 'pkg'), { recursive: true });
+      fs.writeFileSync(path.join(wfsDir, 'node_modules', 'target.txt'), 'should-skip');
+      fs.mkdirSync(path.join(wfsDir, '.git', 'hooks'), { recursive: true });
+      fs.writeFileSync(path.join(wfsDir, '.git', 'target.txt'), 'should-skip');
+      const results = walkForSubdir(wfsDir, 'target.txt');
+      assert.ok(!results.some(r => r.includes('node_modules')));
+      assert.ok(!results.some(r => r.includes('.git')));
+    });
+
+    it('returns empty array for non-existent root', () => {
+      assert.deepStrictEqual(walkForSubdir(path.join(wfsDir, 'ghost'), 'target.txt'), []);
+    });
+  });
+
+  describe('getDefaultScanDirs', () => {
+    it('includes .agents/skills/ecc/skills when it exists', () => {
+      const eccDir = path.join(os.homedir(), '.agents', 'skills', 'ecc', 'skills');
+      const existed = fs.existsSync(eccDir);
+      if (!existed) fs.mkdirSync(eccDir, { recursive: true });
+      try {
+        const dirs = getDefaultScanDirs();
+        assert.ok(dirs.some(d => d.includes('ecc')));
+      } finally {
+        if (!existed) try { fs.rmSync(path.join(os.homedir(), '.agents', 'skills', 'ecc'), { recursive: true, force: true }); } catch {}
+      }
+    });
+  });
+
+  describe('loadSkills edge cases', () => {
+    it('returns empty array for non-string customPath', () => {
+      assert.deepStrictEqual(loadSkills(null), []);
+      assert.deepStrictEqual(loadSkills(42), []);
+    });
+
+    it('blocks path traversal in loadSkills', () => {
+      const traversal = path.join(process.cwd(), '..', '..', '..', '..', 'etc', 'passwd');
+      assert.deepStrictEqual(loadSkills(traversal), []);
+    });
+  });
+
+  describe('detectProjectContext', () => {
+    const ctxDir = path.join(scratchDir, 'test-detect-ctx');
+
+    beforeEach(() => { fs.mkdirSync(ctxDir, { recursive: true }); });
+    afterEach(() => { try { fs.rmSync(ctxDir, { recursive: true, force: true }); } catch {} });
+
+    it('detects Python Django project from pyproject.toml', () => {
+      fs.writeFileSync(path.join(ctxDir, 'pyproject.toml'), '[project]\ndependencies = ["django"]\n', 'utf8');
+      const ctx = detectProjectContext(ctxDir);
+      assert.strictEqual(ctx.language, 'python');
+      assert.strictEqual(ctx.framework, 'django');
+    });
+
+    it('detects Python FastAPI project', () => {
+      fs.writeFileSync(path.join(ctxDir, 'pyproject.toml'), '[project]\ndependencies = ["fastapi", "sqlalchemy", "pytest"]\n', 'utf8');
+      const ctx = detectProjectContext(ctxDir);
+      assert.strictEqual(ctx.language, 'python');
+      assert.strictEqual(ctx.framework, 'fastapi');
+      assert.ok(ctx.libraries.includes('sqlalchemy'));
+      assert.ok(ctx.testingTools.includes('pytest'));
+    });
+
+    it('detects Python Flask project', () => {
+      fs.writeFileSync(path.join(ctxDir, 'pyproject.toml'), '[project]\ndependencies = ["flask"]\n', 'utf8');
+      const ctx = detectProjectContext(ctxDir);
+      assert.strictEqual(ctx.language, 'python');
+      assert.strictEqual(ctx.framework, 'flask');
+    });
+
+    it('falls through from unparseable package.json to pyproject.toml', () => {
+      fs.writeFileSync(path.join(ctxDir, 'package.json'), '{broken}', 'utf8');
+      fs.writeFileSync(path.join(ctxDir, 'pyproject.toml'), '[project]\ndependencies = ["django"]\n', 'utf8');
+      const ctx = detectProjectContext(ctxDir);
+      assert.strictEqual(ctx.language, 'python');
+    });
+
+    it('detects Rust project from Cargo.toml', () => {
+      fs.writeFileSync(path.join(ctxDir, 'Cargo.toml'), '[dependencies]\naxum = "0.7"\ndiesel = { version = "2", features = ["postgres"] }\n', 'utf8');
+      const ctx = detectProjectContext(ctxDir);
+      assert.strictEqual(ctx.language, 'rust');
+      assert.strictEqual(ctx.framework, 'axum');
+      assert.ok(ctx.libraries.includes('diesel'));
+    });
+
+    it('detects Go project from go.mod', () => {
+      fs.writeFileSync(path.join(ctxDir, 'go.mod'), 'module example.com/app\ngo 1.22\nrequire github.com/gin-gonic/gin v1.9\n', 'utf8');
+      const ctx = detectProjectContext(ctxDir);
+      assert.strictEqual(ctx.language, 'go');
+      assert.strictEqual(ctx.framework, 'gin');
+    });
+  });
+
+  describe('buildSkillIndex edge cases', () => {
+    const indexDir = path.join(scratchDir, 'test-build-index-edge');
+
+    beforeEach(() => {
+      fs.mkdirSync(path.join(indexDir, 'alpha'), { recursive: true });
+      fs.writeFileSync(path.join(indexDir, 'alpha', 'SKILL.md'), '---\nname: alpha\ndescription: Alpha skill\n---\n');
+    });
+
+    afterEach(() => {
+      try { fs.rmSync(indexDir, { recursive: true, force: true }); } catch {}
+    });
+
+    it('calls computeEmbeddings callback when provided', async () => {
+      const outPath = path.join(indexDir, 'emb-index.json');
+      let called = false;
+      const embedFn = async (desc) => { called = true; return [0.1, 0.2, 0.3]; };
+      const result = await buildSkillIndex(outPath, [indexDir], null, embedFn);
+      assert.ok(called);
+      assert.ok(result[0].embedding);
+      assert.deepStrictEqual(result[0].embedding, [0.1, 0.2, 0.3]);
+    });
+
+    it('handles computeEmbeddings rejection gracefully', async () => {
+      const outPath = path.join(indexDir, 'emb-fail-index.json');
+      const embedFn = async () => { throw new Error('embed fail'); };
+      const result = await buildSkillIndex(outPath, [indexDir], null, embedFn);
+      assert.ok(result.length > 0);
+      assert.strictEqual(result[0].embedding, undefined);
+    });
+  });
 
   describe('extractSkillsFromData', () => {
     it('extracts from { skills: [...] } envelope', () => {
@@ -1126,6 +1439,22 @@ describe('scanner uncovered paths', () => {
       const skills = loadSkills(envelopeFile);
       assert.strictEqual(skills.length, 0);
     });
+  });
+});
+
+describe('logger', () => {
+  const { logger } = require('../src/logger');
+
+  it('logger.error calls console.error', () => {
+    const calls = [];
+    const orig = console.error;
+    console.error = (...args) => { calls.push(args); };
+    try {
+      logger.error('test error');
+      assert.ok(calls.length > 0);
+    } finally {
+      console.error = orig;
+    }
   });
 });
 
