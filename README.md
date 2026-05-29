@@ -152,12 +152,12 @@ SKILLS_JSON='[{"name":"diagnose","description":"Debugging and fixing bugs"}]' \
   {
     "name": "diagnose",
     "score": 85,
-    "details": { "keywordScore": 28, "semanticScore": 57 }
+    "details": { "keywordScore": 28, "semanticScore": 57, "tokenOverlap": 57 }
   },
   {
     "name": "writing-plans",
     "score": 42,
-    "details": { "keywordScore": 12, "semanticScore": 30 }
+    "details": { "keywordScore": 12, "semanticScore": 30, "tokenOverlap": 30 }
   }
 ]
 ```

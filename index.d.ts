@@ -12,6 +12,7 @@ export interface ScoreResult {
   details: {
     keywordScore: number;
     semanticScore: number;
+    tokenOverlap: number;
     similarity?: number;
   };
 }

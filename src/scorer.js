@@ -136,7 +136,8 @@ async function score(skills, taskText, options) {
       score: total,
       details: {
         keywordScore: roundedKeyword,
-        semanticScore: roundedTokenOverlap
+        semanticScore: roundedTokenOverlap,
+        tokenOverlap: roundedTokenOverlap
       }
     };
   }));

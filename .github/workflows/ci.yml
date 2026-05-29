@@ -20,8 +20,12 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
       - run: npm test
+      - run: npm run test:coverage
       - run: npm run lint
       - run: npm run build:plugin
+      - name: Smoke test benchmark
+        run: |
+          npm run benchmark
       - name: Smoke test --validate
         run: |
           node scripts/skill-matcher.js --validate SKILL.md

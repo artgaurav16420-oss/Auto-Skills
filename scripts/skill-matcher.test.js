@@ -1359,7 +1359,7 @@ describe('scanner uncovered paths', () => {
     it('calls computeEmbeddings callback when provided', async () => {
       const outPath = path.join(indexDir, 'emb-index.json');
       let called = false;
-      const embedFn = async (desc) => { called = true; return [0.1, 0.2, 0.3]; };
+      const embedFn = async (_desc) => { called = true; return [0.1, 0.2, 0.3]; };
       const result = await buildSkillIndex(outPath, [indexDir], null, embedFn);
       assert.ok(called);
       assert.ok(result[0].embedding);

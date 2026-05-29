@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.2.1] - 2026-05-29
+
+### Added
+- `ScoreResult.details` now includes `tokenOverlap` field alongside `semanticScore` for clarity. Non-breaking — `semanticScore` kept as compat alias.
+
+### CI
+- Benchmark and coverage smoke steps added to GitHub Actions workflow.
+
+---
+
 ## [2.2.0] - 2026-05-27
 
 ### Fixed
