@@ -4,7 +4,7 @@
 </picture>
 
 <p align="center">
-   <img src="https://img.shields.io/badge/tests-124%2F124-brightgreen?style=flat-square&logo=vitest" alt="Tests">
+   <img src="https://img.shields.io/badge/tests-156%2F156-brightgreen?style=flat-square" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js" alt="Node">
   <img src="https://img.shields.io/badge/dependencies-0%20required-success?style=flat-square" alt="Dependencies">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
@@ -34,7 +34,7 @@ Built for developers who want their AI tools to be **proactive**, not reactive.
 | 🛡️ | **Secure by Default** — path traversal protection, no telemetry, no network calls | Your code never leaves your machine |
 | 🔍 | **Auto-Discovery** — `--scan` finds every installed skill | Score your entire skillset with one command |
 | 🏷️ | **Index Mode** — `--index` builds a lightweight skills index | Reduce LLM prompt overhead by ~85% |
-| 📦 | **Self-Contained** — ~17 files, ~900 LOC | Fully auditable in an afternoon |
+| 📦 | **Self-Contained** — ~20 files, ~1350 LOC source | Fully auditable in an afternoon |
 
 ---
 
@@ -195,7 +195,7 @@ The skill auto-activates via `activate_skill` in the session lifecycle.
 
 ## 📚 API Reference
 
-All exported functions have JSDoc annotations and are fully tested (85 tests, all passing).
+All exported functions have JSDoc annotations and are fully tested (156 tests, all passing).
 
 ### `score(skills, taskText)`
 
@@ -267,7 +267,7 @@ We ❤️ pull requests — but please follow these guidelines:
 
 1. **Discuss first** — open a GitHub issue before starting work. No blind PRs.
 2. **Surgical changes** — touch only what the issue requires. No scope creep.
-3. **Tests must pass** — run `npm test`, keep all 85 green.
+3. **Tests must pass** — run `npm test`, keep all 156 green.
 4. **JSDoc all exports** — every public function needs a JSDoc block.
 5. **Conventional Commits** — `feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`.
 6. **Zero runtime deps** — no new npm dependencies without discussion in the issue.
@@ -275,7 +275,7 @@ We ❤️ pull requests — but please follow these guidelines:
 ```bash
 git clone https://github.com/artgaurav16420-oss/Auto-Skills.git
 cd auto-skill-select
-npm test                    # 85 tests, all green
+npm test                    # 156 tests, all green
 ```
 ---
 
@@ -298,7 +298,7 @@ auto-skill-select/
 │   └── auto-skill-hook.ts
 ├── scripts/
 │   ├── skill-matcher.js        # thin CLI wrapper
-│   └── skill-matcher.test.js   # 85 tests
+│   └── skill-matcher.test.js   # 156 tests
 ├── src/
 │   ├── constants.js
 │   ├── index.js
@@ -324,7 +324,7 @@ auto-skill-select/
   <br/>
   <strong>OpenCode</strong> · <strong>Claude Code</strong> · <strong>Gemini CLI</strong>
   <br/>
-  <sub>MIT © 2026 · Zero required dependencies · ~900 LOC · 85 passing tests</sub>
+  <sub>MIT © 2026 · Zero required dependencies · ~1350 LOC source · 156 passing tests</sub>
   <br/>
   <sub>
     <a href="#top">Back to top</a>
