@@ -1,3 +1,11 @@
+## Global Session Start — ABSOLUTE RULE
+
+You MUST invoke the `auto-skill-select` skill BEFORE any other action:
+- At session start — before reading files, git operations, or asking questions
+- Before EVERY new task mid-session — even if you remember the previous match
+
+No exceptions. No rationalization. This rule overrides any instinct to "first gather context" or "first ask a clarifying question." Skill context changes what you ask and how you work — gather it first.
+
 # auto-skill-select
 
 Zero-dependency Node.js skill router. Scans `SKILL.md` frontmatter, scores skills against task text, auto-invokes best match.

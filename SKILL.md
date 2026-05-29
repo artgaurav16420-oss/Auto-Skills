@@ -21,6 +21,13 @@ This workflow re-runs on **every task change** — not just session start. When 
 **Task layer (matched per-request):**
 All other skills from `.skills-index.json` scored against the user's task. Multiple skills can be loaded if they all score highly on different dimensions of the same task.
 
+## Rules
+
+- Run this workflow (steps 0-6 below) **before ANY clarifying question**. Skill context may change what you ask.
+- **Re-run on every task change.** Detect task switches by parsing user messages — new domain, action, or technology signals a shift. On task change, skip step 0 (index still valid) and step 1 (base layer still loaded); re-run from step 2.
+- On session start, run full workflow (steps 0-6). On mid-session task switch, run steps 2-6 only.
+- This workflow is **not optional**. Do not skip it because you "already know the task" or "want to gather context first."
+
 ## Workflow
 
 ### 0. Preflight: Ensure skills index exists
@@ -213,11 +220,8 @@ node scripts/skill-matcher.js --multi "build a react dashboard" ./skills-index.j
 node scripts/skill-matcher.js --multi --threshold 60 "debug login flow" ./skills-index.json
 ```
 
-## Rules
+## Detailed Rules
 
-- Run this before ANY clarifying question. Skill context may change what you ask.
-- **Re-run on every task change.** Detect task switches by parsing user messages — new domain, action, or technology signals a shift. On task change, skip step 0 (index still valid) and step 1 (base layer still loaded); re-run from step 2.
-- On session start, run full workflow (steps 0-6). On mid-session task switch, run steps 2-6 only.
 - Always load Caveman + Karpathy Guidelines + Superpowers first — they are non-negotiable on every task.
 - After base layer, find all task-specific skills scoring >=70 and load the top results (multi if all are 70-90, single if the highest is >90).
 - If the highest-scoring skill is >90, load only that single skill. If no skill is >90 but multiple skills score 70-90, load all of them (deduplicating aliases).
