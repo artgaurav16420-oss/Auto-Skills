@@ -23,6 +23,7 @@ node scripts/skill-matcher.js --enrich [dir] [out] [scanDir]  # enriched index
 node scripts/skill-matcher.js --multi [--threshold N] <task> [index]
 node scripts/skill-matcher.js --catalog              # show known-skills.json
 node scripts/skill-matcher.js --setup [path]         # add hook to AGENTS.md
+node scripts/skill-matcher.js --setup-opencode [path] # configure opencode.jsonc
 ```
 
 ## Architecture

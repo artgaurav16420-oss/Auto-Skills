@@ -3,7 +3,7 @@
 const { score } = require('./scorer');
 const { tokenize, extractIntent, clearCache, resetSynonyms, loadSynonyms } = require('./tokenizer');
 const { loadSkills, parseSkillFrontmatter, discoverSkills, buildSkillIndex, detectProjectContext } = require('./scanner');
-const { setupAgentsMd } = require('./setup');
+const { setupAgentsMd, setupOpencodeJsonc } = require('./setup');
 const { createReranker } = require('./reranker');
 const { logger } = require('./logger');
 
@@ -26,7 +26,7 @@ function getSemantic() {
 
 module.exports = {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
-  discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
+  discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd, setupOpencodeJsonc,
   clearCache, resetSynonyms, loadSynonyms,
   createReranker,
   get computeSemanticScore() { return getSemantic().computeSemanticScore; },

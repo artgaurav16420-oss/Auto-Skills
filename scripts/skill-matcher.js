@@ -8,7 +8,7 @@ const readline = require('readline');
 const {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache, resetSynonyms, loadSynonyms
+  clearCache, resetSynonyms, loadSynonyms, setupOpencodeJsonc
 } = require('../src/index');
 
 
@@ -243,6 +243,19 @@ async function main() {
     return;
   }
 
+  if (args[0] === '--setup-opencode') {
+    const result = setupOpencodeJsonc(args[1] ? path.resolve(args[1]) : undefined);
+    if (result.status === 'error') {
+      console.log(`\u2717 ${result.message}`);
+      process.exit(1);
+    } else if (result.status === 'created') {
+      console.log(`\u2713 Created ${result.path} with recommended config`);
+    } else {
+      console.log(`\u2713 Updated ${result.path} with missing config keys`);
+    }
+    return;
+  }
+
   if (args[0] === '--enrich' || args[0] === '-e') {
     const projectDir = args[1] ? path.resolve(args[1]) : undefined;
     const outputPath = args[2] ? path.resolve(args[2]) : undefined;
@@ -299,7 +312,7 @@ if (require.main === module) main().catch(err => {
 });
 module.exports = {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
-  discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
+  discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd, setupOpencodeJsonc,
   clearCache, resetSynonyms, loadSynonyms, loadCatalog,
   validateSkill
 };

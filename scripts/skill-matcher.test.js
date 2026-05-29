@@ -487,6 +487,92 @@ describe('setupAgentsMd', () => {
   });
 });
 
+describe('setupOpencodeJsonc', () => {
+  const { setupOpencodeJsonc } = require('./skill-matcher');
+  const sandbox = path.join(__dirname, '..', '.code-review-cache', 'test-opencode-setup');
+
+  beforeEach(() => {
+    fs.mkdirSync(sandbox, { recursive: true });
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(sandbox, { recursive: true, force: true }); } catch {}
+  });
+
+  it('creates file with recommended config when opencode.jsonc does not exist', () => {
+    const fakePath = path.join(sandbox, 'opencode.jsonc');
+    const result = setupOpencodeJsonc(fakePath);
+    assert.strictEqual(result.status, 'created');
+    assert.ok(fs.existsSync(fakePath));
+    const loaded = JSON.parse(fs.readFileSync(fakePath, 'utf8'));
+    assert.strictEqual(loaded.$schema, 'https://opencode.ai/config.json');
+    assert.ok(loaded.instructions.includes('~/.agents/skills/karpathy-guidelines/SKILL.md'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/caveman/SKILL.md'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/auto-skill-select/SKILL.md'));
+    assert.strictEqual(loaded.permission.skill['karpathy-guidelines'], 'allow');
+    assert.strictEqual(loaded.permission.skill['*'], 'deny');
+  });
+
+  it('merges with existing config without removing user settings', () => {
+    const fakePath = path.join(sandbox, 'opencode-merge.jsonc');
+    fs.writeFileSync(fakePath, JSON.stringify({
+      instructions: ['~/.agents/skills/diagnose/SKILL.md'],
+      permission: { skill: { diagnose: 'allow' } }
+    }, null, 2), 'utf8');
+    const result = setupOpencodeJsonc(fakePath);
+    assert.strictEqual(result.status, 'updated');
+    const loaded = JSON.parse(fs.readFileSync(fakePath, 'utf8'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/diagnose/SKILL.md'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/karpathy-guidelines/SKILL.md'));
+    assert.strictEqual(loaded.permission.skill.diagnose, 'allow');
+    assert.strictEqual(loaded.permission.skill['*'], 'deny');
+  });
+
+  it('is idempotent — running twice produces same result', () => {
+    const fakePath = path.join(sandbox, 'opencode-idempotent.jsonc');
+    setupOpencodeJsonc(fakePath);
+    const first = JSON.parse(fs.readFileSync(fakePath, 'utf8'));
+    setupOpencodeJsonc(fakePath);
+    const second = JSON.parse(fs.readFileSync(fakePath, 'utf8'));
+    assert.deepStrictEqual(first, second);
+  });
+
+  it('handles JSONC files with // comments', () => {
+    const fakePath = path.join(sandbox, 'opencode-comments.jsonc');
+    fs.writeFileSync(fakePath, `{
+  // user comment
+  "instructions": ["~/.agents/skills/diagnose/SKILL.md"]
+}
+`, 'utf8');
+    const result = setupOpencodeJsonc(fakePath);
+    assert.strictEqual(result.status, 'updated');
+    const loaded = JSON.parse(fs.readFileSync(fakePath, 'utf8'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/karpathy-guidelines/SKILL.md'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/diagnose/SKILL.md'));
+  });
+
+  it('prints correct message via --setup-opencode CLI flag', () => {
+    const fakePath = path.join(sandbox, 'cli-opencode.jsonc');
+    const out = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --setup-opencode "${fakePath}"`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    assert.ok(out.includes('Created'));
+    assert.ok(out.includes('opencode.jsonc'));
+    assert.ok(fs.existsSync(fakePath));
+  });
+
+  it('prints updated message for existing file via CLI', () => {
+    const fakePath = path.join(sandbox, 'cli-opencode-update.jsonc');
+    fs.writeFileSync(fakePath, '{"instructions":[]}', 'utf8');
+    const out = require('child_process').execSync(
+      `node "${path.join(__dirname, 'skill-matcher.js')}" --setup-opencode "${fakePath}"`,
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    assert.ok(out.includes('Updated'));
+  });
+});
+
 describe('main (CLI entry point)', () => {
   const testSkillsPath = path.join(__dirname, '..', '.code-review-cache', 'test-skills.json');
 

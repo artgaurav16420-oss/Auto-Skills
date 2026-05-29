@@ -48,3 +48,4 @@ export function detectProjectContext(projectDir?: string): ProjectContext;
 export function clearCache(): void;
 export function resetSynonyms(): void;
 export function loadSynonyms(): Record<string, string[]>;
+export function setupOpencodeJsonc(configPath?: string): { status: string; path: string; message?: string };

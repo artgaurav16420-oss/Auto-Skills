@@ -53,6 +53,17 @@ After setup, this check won't trigger again.
 
 ### 0b. OpenCode permission config (optional, recommended)
 
+New users can run the following after cloning to auto-configure `opencode.jsonc`:
+
+```bash
+node scripts/skill-matcher.js --setup [path]         # add hook to AGENTS.md
+node scripts/skill-matcher.js --setup-opencode [path] # configure opencode.jsonc
+```
+
+This merges the recommended `instructions` and `permission.skill` rules into your existing config without removing any settings you already have.
+
+Alternatively, add the following manually:
+
 On OpenCode, the platform auto-injects ALL discovered skills into `<available_skills>`
 in the system prompt. With many skills installed, this can consume ~40KB+ of context.
 Add permission rules to deny non-essential skills — auto-skill-select loads matched
@@ -83,7 +94,7 @@ skills, reclaiming ~40KB of context.
 > **Note:** The old `plugins/auto-skill-hook.ts` approach is deprecated. It
 > injected skill content into every user message, causing per-turn context
 > accumulation. The `permission.skill` + `instructions` approach is cleaner
-> and more efficient.
+> and more efficient. Run `--setup-opencode` to apply it automatically.
 
 ### 1. Load permanent base layer
 
