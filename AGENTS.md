@@ -13,7 +13,7 @@ Zero-dependency Node.js skill router. Scans `SKILL.md` frontmatter, scores skill
 ## Commands
 
 ```bash
-npm test                             # 85 tests, uses node:test (not jest/vitest)
+npm test                             # 124 tests, uses node:test (not jest/vitest)
 npm run test:coverage                # --experimental-test-coverage
 node scripts/skill-matcher.js        # interactive mode
 node scripts/skill-matcher.js <task> [skills.json]
@@ -48,7 +48,7 @@ node scripts/skill-matcher.js --setup [path]         # add hook to AGENTS.md
 - Tests use `node:test` (built-in), not third-party runners
 - Integration tests spawn CLI via `child_process.execSync` with 5s timeout
 - Test-scratch dirs go under `.code-review-cache/` (gitignored)
-- CI: ubuntu-latest, Node 18/20/22 matrix, just `npm test`
+- CI: ubuntu-latest, Node 20/22 matrix, just `npm test`
 
 ## Key gotchas
 

@@ -37,7 +37,7 @@ async function getFeatureExtractor() {
  * Compute cosine similarity between two vectors.
  * @param {number[]} vecA
  * @param {number[]} vecB
- * @returns {number} 0.0 to 1.0
+ * @returns {number} -1.0 to 1.0
  */
 function cosineSimilarity(vecA, vecB) {
   if (vecA.length !== vecB.length) return 0;

@@ -4,7 +4,7 @@
 </picture>
 
 <p align="center">
-   <img src="https://img.shields.io/badge/tests-85%2F85-brightgreen?style=flat-square&logo=vitest" alt="Tests">
+   <img src="https://img.shields.io/badge/tests-124%2F124-brightgreen?style=flat-square&logo=vitest" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js" alt="Node">
   <img src="https://img.shields.io/badge/dependencies-0%20required-success?style=flat-square" alt="Dependencies">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
