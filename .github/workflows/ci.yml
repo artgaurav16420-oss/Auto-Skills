@@ -25,18 +25,20 @@ jobs:
       - run: npm run lint
       - run: npm run build:plugin
       - name: Smoke test benchmark
-        run: |
-          npm run benchmark
+        run: npm run benchmark
       - name: Smoke test --validate
+        shell: bash
         run: |
           node scripts/skill-matcher.js --validate SKILL.md
           node scripts/skill-matcher.js --validate package.json && exit 1 || true
       - name: Smoke test --semantic
+        shell: bash
         env:
           SKILLS_JSON: '[{"name":"test","description":"debugging skill"}]'
         run: |
           timeout 30 node scripts/skill-matcher.js --semantic "test task" && echo "OK" || echo "SKIP (model download may fail)"
       - name: Smoke test --rerank
+        shell: bash
         env:
           SKILLS_JSON: '[{"name":"test","description":"debugging skill"}]'
         run: |
