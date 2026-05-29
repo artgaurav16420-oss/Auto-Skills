@@ -8,7 +8,7 @@ const readline = require('readline');
 const {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd,
-  clearCache, resetSynonyms, loadSynonyms, setupOpencodeJsonc
+  clearCache, resetSynonyms, setupOpencodeJsonc
 } = require('../src/index');
 
 
@@ -313,6 +313,6 @@ if (require.main === module) main().catch(err => {
 module.exports = {
   score, tokenize, loadSkills, extractIntent, parseSkillFrontmatter,
   discoverSkills, buildSkillIndex, detectProjectContext, setupAgentsMd, setupOpencodeJsonc,
-  clearCache, resetSynonyms, loadSynonyms, loadCatalog,
+  clearCache, resetSynonyms, loadCatalog,
   validateSkill
 };

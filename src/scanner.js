@@ -194,12 +194,8 @@ function getDefaultScanDirs() {
   const eccSkills = path.join(userAgentsSkills, 'ecc', 'skills');
   if (fs.existsSync(eccSkills)) dirs.push(eccSkills);
   const cacheBase = path.join(os.homedir(), '.cache', 'opencode', 'packages');
-  try {
-    const found = walkForSubdir(cacheBase, path.join('node_modules', 'superpowers', 'skills'));
-    dirs.push(...found);
-  } catch (err) {
-    logger.debug(`getDefaultScanDirs: cannot walk ${cacheBase} — ${err.message}`);
-  }
+  const found = walkForSubdir(cacheBase, path.join('node_modules', 'superpowers', 'skills'));
+  dirs.push(...found);
   return dirs;
 }
 

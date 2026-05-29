@@ -133,8 +133,12 @@ function tokenize(text, opts) {
   }
 
   if (tokenizeCache.size >= MAX_LRU_CACHE_SIZE) {
-    const firstKey = tokenizeCache.keys().next().value;
-    if (firstKey !== undefined) tokenizeCache.delete(firstKey);
+    const keysToEvict = Math.ceil(MAX_LRU_CACHE_SIZE * 0.1);
+    for (let i = 0; i < keysToEvict; i++) {
+      const key = tokenizeCache.keys().next().value;
+      if (key === undefined) break;
+      tokenizeCache.delete(key);
+    }
   }
   tokenizeCache.set(cacheKey, tokens);
   return tokens;

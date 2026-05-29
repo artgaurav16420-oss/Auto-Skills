@@ -50,7 +50,7 @@ describe('tokenize', () => {
     assert.ok(result.includes('login'));
   });
 
-  it('evicts oldest cache entry when cache exceeds limit', () => {
+  it('evicts oldest entries when cache exceeds limit', () => {
     const { clearCache } = require('./skill-matcher');
     clearCache();
     const maxSize = 1000;
@@ -553,6 +553,20 @@ describe('setupOpencodeJsonc', () => {
     const fakePath = path.join(sandbox, 'opencode-comments.jsonc');
     fs.writeFileSync(fakePath, `{
   // user comment
+  "instructions": ["~/.agents/skills/diagnose/SKILL.md"]
+}
+`, 'utf8');
+    const result = setupOpencodeJsonc(fakePath);
+    assert.strictEqual(result.status, 'updated');
+    const loaded = JSON.parse(fs.readFileSync(fakePath, 'utf8'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/karpathy-guidelines/SKILL.md'));
+    assert.ok(loaded.instructions.includes('~/.agents/skills/diagnose/SKILL.md'));
+  });
+
+  it('handles JSONC files with /* */ block comments', () => {
+    const fakePath = path.join(sandbox, 'opencode-block-comments.jsonc');
+    fs.writeFileSync(fakePath, `{
+  /* block comment */
   "instructions": ["~/.agents/skills/diagnose/SKILL.md"]
 }
 `, 'utf8');
@@ -1454,6 +1468,18 @@ describe('logger', () => {
       assert.ok(calls.length > 0);
     } finally {
       console.error = orig;
+    }
+  });
+
+  it('logger.info calls console.log', () => {
+    const calls = [];
+    const orig = console.log;
+    console.log = (...args) => { calls.push(args); };
+    try {
+      logger.info('test info');
+      assert.ok(calls.length > 0);
+    } finally {
+      console.log = orig;
     }
   });
 });

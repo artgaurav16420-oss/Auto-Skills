@@ -32,7 +32,9 @@ const RECOMMENDED_SKILL_PERMISSIONS = {
  * @returns {string}
  */
 function stripJsoncComments(text) {
-  return text.replace(/\/\/.*$/gm, '');
+  return text
+    .replace(/\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 /**

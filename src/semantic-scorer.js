@@ -6,28 +6,45 @@ const { logger } = require('./logger');
 const { SEMANTIC_SCORE_MAX } = require('./constants');
 
 const EMBEDDING_CACHE_MAX = 500;
+const MODEL_RETRY_MAX = 3;
+const MODEL_RETRY_BASE_MS = 1000;
 
 let featureExtractorPromise = null;
+let modelLoadAttempts = 0;
 const embeddingCache = new Map();
 
 /**
  * Get or initialize the feature extraction pipeline (lazy singleton).
+ * Retries with exponential backoff on transient failures.
  * Stores the in-flight promise to prevent concurrent parallel loads.
  * @returns {Promise<Function>} pipeline function
  */
 async function getFeatureExtractor() {
-  if (featureExtractorPromise) return featureExtractorPromise;
+  if (featureExtractorPromise) {
+    modelLoadAttempts = 0;
+    return featureExtractorPromise;
+  }
   featureExtractorPromise = (async () => {
-    try {
-      const { pipeline } = require('@huggingface/transformers');
-      logger.debug('Loading all-MiniLM-L6-v2 model...');
-      const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
-      logger.debug('Model loaded successfully.');
-      return extractor;
-    } catch (err) {
-      logger.error(`Failed to load feature-extraction model: ${err.message}`);
-      featureExtractorPromise = null;
-      throw err;
+    const delay = (ms) => new Promise(r => setTimeout(r, ms));
+    while (modelLoadAttempts < MODEL_RETRY_MAX) {
+      try {
+        const { pipeline } = require('@huggingface/transformers');
+        logger.debug('Loading all-MiniLM-L6-v2 model...');
+        const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
+        logger.debug('Model loaded successfully.');
+        modelLoadAttempts = 0;
+        return extractor;
+      } catch (err) {
+        modelLoadAttempts++;
+        if (modelLoadAttempts >= MODEL_RETRY_MAX) {
+          logger.error(`Failed to load feature-extraction model after ${MODEL_RETRY_MAX} attempts: ${err.message}`);
+          featureExtractorPromise = null;
+          throw err;
+        }
+        const backoff = MODEL_RETRY_BASE_MS * Math.pow(2, modelLoadAttempts - 1);
+        logger.warn(`Model load attempt ${modelLoadAttempts}/${MODEL_RETRY_MAX} failed, retrying in ${backoff}ms: ${err.message}`);
+        await delay(backoff);
+      }
     }
   })();
   return featureExtractorPromise;

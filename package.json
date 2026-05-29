@@ -13,8 +13,7 @@
     "lint": "eslint scripts/ src/",
     "start": "node scripts/skill-matcher.js",
     "benchmark": "node benchmark/run.js",
-    "build:plugin": "tsc -p tsconfig.plugin.json",
-    "prepublishOnly": "npm run build:plugin"
+    "build:plugin": "tsc -p tsconfig.plugin.json"
   },
   "private": true,
   "keywords": [
