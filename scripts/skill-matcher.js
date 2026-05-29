@@ -23,7 +23,7 @@ function printScore(taskText, customPath, useSemantic) {
     console.log(JSON.stringify(results, null, 2));
     return true;
   }).catch(err => {
-    console.log(JSON.stringify({ error: err.message }));
+    console.error(JSON.stringify({ error: err.message }));
     return false;
   });
 }
@@ -43,7 +43,7 @@ function scanAndScore(taskText, scanDirs) {
     console.log(JSON.stringify(results, null, 2));
     return true;
   }).catch(err => {
-    console.log(JSON.stringify({ error: err.message }));
+    console.error(JSON.stringify({ error: err.message }));
   });
 }
 
@@ -62,7 +62,7 @@ function printMultiScore(taskText, customPath, threshold) {
     console.log(JSON.stringify({ threshold, count: filtered.length, results: filtered }, null, 2));
     return true;
   }).catch(err => {
-    console.log(JSON.stringify({ error: err.message }));
+    console.error(JSON.stringify({ error: err.message }));
   });
 }
 
@@ -97,6 +97,8 @@ function validateSkill(skillPath) {
     } else {
       if (!parsed.name || parsed.name.trim().length === 0) {
         issues.push('Missing required field: name');
+      } else if (!/^[a-z0-9][a-z0-9_-]*$/i.test(parsed.name.trim())) {
+        issues.push('Invalid name: must start with alphanumeric and contain only alphanumeric, underscore, or hyphen characters');
       }
       if (!parsed.description || parsed.description.trim().length === 0) {
         issues.push('Missing required field: description');
@@ -126,29 +128,30 @@ async function main() {
       rl.close();
       process.exit(1);
     });
-    rl.question('Describe the task: ', input => {
-      if (!input || !input.trim()) {
-        console.log('No task entered. Exiting.');
-        rl.close();
-        return;
-      }
-      printScore(input.trim());
-      rl.close();
+    const input = await new Promise(resolve => {
+      rl.question('Describe the task: ', resolve);
     });
+    if (!input || !input.trim()) {
+      console.log('No task entered. Exiting.');
+      rl.close();
+      return;
+    }
+    await printScore(input.trim());
+    rl.close();
     return;
   }
 
   if (args[0] === '--validate' || args[0] === '-v') {
     const skillPath = args[1];
     if (!skillPath) {
-      console.log(JSON.stringify({ error: 'Skill path required after --validate' }));
-      return;
+      console.error(JSON.stringify({ error: 'Skill path required after --validate' }));
+      process.exit(1);
     }
     const result = validateSkill(skillPath);
     if (result.valid) {
       console.log(JSON.stringify({ valid: true, message: 'Skill is valid' }));
     } else {
-      console.log(JSON.stringify({ valid: false, issues: result.issues }));
+      console.error(JSON.stringify({ valid: false, issues: result.issues }));
       process.exit(1);
     }
     return;
@@ -158,8 +161,8 @@ async function main() {
     const taskText = args[1];
     const customPath = args[2];
     if (!taskText) {
-      console.log(JSON.stringify({ error: 'Task text required after --semantic' }));
-      return;
+      console.error(JSON.stringify({ error: 'Task text required after --semantic' }));
+      process.exit(1);
     }
     const skills = loadSkills(customPath);
     if (skills.length === 0) {
@@ -185,10 +188,10 @@ async function main() {
     const taskText = nonFlagArgs[0];
     const indexPath = nonFlagArgs[1];
     if (!taskText) {
-      console.log(JSON.stringify({ error: 'Task text required after --multi' }));
-      return;
+      console.error(JSON.stringify({ error: 'Task text required after --multi' }));
+      process.exit(1);
     }
-    printMultiScore(taskText, indexPath, threshold);
+    await printMultiScore(taskText, indexPath, threshold);
     return;
   }
 
@@ -204,30 +207,32 @@ async function main() {
         rl.close();
         process.exit(1);
       });
-      rl.question('Describe the task: ', input => {
-        if (!input || !input.trim()) {
-          console.log('No task entered. Exiting.');
-          rl.close();
-          return;
-        }
-        scanAndScore(input.trim(), scanDirs);
-        rl.close();
+      const input = await new Promise(resolve => {
+        rl.question('Describe the task: ', resolve);
       });
+      if (!input || !input.trim()) {
+        console.log('No task entered. Exiting.');
+        rl.close();
+        return;
+      }
+      await scanAndScore(input.trim(), scanDirs);
+      rl.close();
       return;
     }
-    scanAndScore(taskText, scanDirs);
+    await scanAndScore(taskText, scanDirs);
     return;
   }
 
   if (args[0] === '--index' || args[0] === '-i') {
     const outputPath = args[1] ? path.resolve(args[1]) : undefined;
     const scanDirs = args[2] ? [args[2]] : undefined;
-    buildSkillIndex(outputPath, scanDirs).then(output => {
+    try {
+      const output = await buildSkillIndex(outputPath, scanDirs);
       const count = Array.isArray(output) ? output.length : output.skills.length;
       console.log(`Indexed ${count} skills \u2192 ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
-    }).catch(err => {
-      console.log(`Index error: ${err.message}`);
-    });
+    } catch (err) {
+      console.error(`Index error: ${err.message}`);
+    }
     return;
   }
 
@@ -246,8 +251,10 @@ async function main() {
   if (args[0] === '--setup-opencode') {
     const result = setupOpencodeJsonc(args[1] ? path.resolve(args[1]) : undefined);
     if (result.status === 'error') {
-      console.log(`\u2717 ${result.message}`);
+      console.error(`\u2717 ${result.message}`);
       process.exit(1);
+    } else if (result.status === 'no-change') {
+      console.log(`\u2713 ${result.path} already has all recommended settings`);
     } else if (result.status === 'created') {
       console.log(`\u2713 Created ${result.path} with recommended config`);
     } else {
@@ -261,13 +268,14 @@ async function main() {
     const outputPath = args[2] ? path.resolve(args[2]) : undefined;
     const scanDirs = args[3] ? [args[3]] : undefined;
     const ctx = detectProjectContext(projectDir);
-    buildSkillIndex(outputPath, scanDirs, ctx).then(output => {
+    try {
+      const output = await buildSkillIndex(outputPath, scanDirs, ctx);
       const count = output.skills.length;
       console.log(`Indexed ${count} skills with project context \u2192 ${outputPath || path.join(process.cwd(), '.skills-index.json')}`);
       if (ctx.language) console.log(`  ${ctx.language}${ctx.framework ? '/' + ctx.framework : ''}${ctx.libraries.length > 0 ? ' [' + ctx.libraries.join(', ') + ']' : ''}`);
-    }).catch(err => {
-      console.log(`Enrich error: ${err.message}`);
-    });
+    } catch (err) {
+      console.error(`Enrich error: ${err.message}`);
+    }
     return;
   }
 
@@ -275,8 +283,8 @@ async function main() {
     const taskText = args[1];
     const customPath = args[2];
     if (!taskText) {
-      console.log(JSON.stringify({ error: 'Task text required after --rerank' }));
-      return;
+      console.error(JSON.stringify({ error: 'Task text required after --rerank' }));
+      process.exit(1);
     }
     const skills = loadSkills(customPath);
     if (skills.length === 0) {

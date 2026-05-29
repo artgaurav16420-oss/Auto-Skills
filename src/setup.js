@@ -88,35 +88,51 @@ function setupOpencodeJsonc(configPath) {
     }
   }
 
-  if (!existing.instructions) {
-    existing.instructions = [];
-  }
-  for (const instr of RECOMMENDED_INSTRUCTIONS) {
-    if (!existing.instructions.includes(instr)) {
-      existing.instructions.push(instr);
-    }
-  }
+  if (fileExisted) {
+    let needsWrite = false;
 
-  if (!existing.permission) {
-    existing.permission = {};
-  }
-  if (!existing.permission.skill) {
-    existing.permission.skill = {};
-  }
-  for (const [skillName, perm] of Object.entries(RECOMMENDED_SKILL_PERMISSIONS)) {
-    if (!(skillName in existing.permission.skill)) {
-      existing.permission.skill[skillName] = perm;
+    if (!existing.instructions) {
+      existing.instructions = [];
     }
-  }
+    for (const instr of RECOMMENDED_INSTRUCTIONS) {
+      if (!existing.instructions.includes(instr)) {
+        existing.instructions.push(instr);
+        needsWrite = true;
+      }
+    }
 
-  if (!existing['$schema']) {
-    existing['$schema'] = OPENCODE_JSONC_SCHEMA;
+    if (!existing.permission) {
+      existing.permission = {};
+    }
+    if (!existing.permission.skill) {
+      existing.permission.skill = {};
+    }
+    for (const [skillName, perm] of Object.entries(RECOMMENDED_SKILL_PERMISSIONS)) {
+      if (!(skillName in existing.permission.skill)) {
+        existing.permission.skill[skillName] = perm;
+        needsWrite = true;
+      }
+    }
+
+    if (!existing['$schema']) {
+      existing['$schema'] = OPENCODE_JSONC_SCHEMA;
+      needsWrite = true;
+    }
+
+    if (needsWrite) {
+      fs.writeFileSync(target, JSON.stringify(existing, null, 2) + '\n', 'utf8');
+      return { status: 'updated', path: target };
+    }
+    return { status: 'no-change', path: target };
   }
 
   fs.mkdirSync(path.dirname(target), { recursive: true });
+  existing.instructions = [...RECOMMENDED_INSTRUCTIONS];
+  existing.permission = { skill: { ...RECOMMENDED_SKILL_PERMISSIONS } };
+  existing['$schema'] = OPENCODE_JSONC_SCHEMA;
   fs.writeFileSync(target, JSON.stringify(existing, null, 2) + '\n', 'utf8');
 
-  return { status: fileExisted ? 'updated' : 'created', path: target };
+  return { status: 'created', path: target };
 }
 
 module.exports = { setupAgentsMd, setupOpencodeJsonc, AGENTS_MD_HOOK, AGENTS_MD_CHECK, OPENCODE_JSONC_SCHEMA, RECOMMENDED_INSTRUCTIONS, RECOMMENDED_SKILL_PERMISSIONS };

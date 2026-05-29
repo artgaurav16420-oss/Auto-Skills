@@ -2,6 +2,7 @@
 
 const { tokenize, extractIntent } = require('./tokenizer');
 const { KEYWORD_SCORE_MAX, SEMANTIC_SCORE_MAX, TOTAL_SCORE_MAX, MAX_INPUT_LENGTH } = require('./constants');
+const { logger } = require('./logger');
 
 const HYBRID_KEYWORD_WEIGHT = 0.3;
 const HYBRID_SEMANTIC_WEIGHT = 0.7;
@@ -65,9 +66,11 @@ function computeTokenOverlapScore(taskTokens, skillStr) {
  */
 async function score(skills, taskText, options) {
   if (!Array.isArray(skills) || skills.length === 0) {
+    logger.warn('score() called with empty or invalid skills array');
     return [];
   }
   if (!taskText || typeof taskText !== 'string' || !taskText.trim()) {
+    logger.warn('score() called with empty or invalid task text');
     return [];
   }
   const text = taskText.length > MAX_INPUT_LENGTH ? taskText.slice(0, MAX_INPUT_LENGTH) : taskText;

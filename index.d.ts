@@ -50,3 +50,10 @@ export function clearCache(): void;
 export function resetSynonyms(): void;
 export function loadSynonyms(): Record<string, string[]>;
 export function setupOpencodeJsonc(configPath?: string): { status: string; path: string; message?: string };
+export function setupAgentsMd(agentsPath?: string): { status: string; path: string };
+export function createReranker<T>(customReranker?: (top3: T[], query: string) => Promise<{ name: string }>): { rerank: Function };
+
+export function computeSemanticScore(query: string, description: string, cachedEmbedding?: number[]): Promise<{ score: number; similarity: number }>;
+export function computeEmbedding(text: string): Promise<number[]>;
+export function cosineSimilarity(vecA: number[], vecB: number[]): number;
+export function computeSkillHash(skillPath: string): string | null;

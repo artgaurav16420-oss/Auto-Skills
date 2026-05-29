@@ -608,7 +608,7 @@ describe('setupOpencodeJsonc', () => {
         { encoding: 'utf8', timeout: 5000 }
       );
     } catch (e) {
-      result = e.stdout;
+      result = e.stderr;
     }
     assert.ok(result.includes('Manual setup required'));
   });
@@ -761,10 +761,15 @@ description: A skill for debugging code
   });
 
   it('shows error when --rerank has no task', () => {
-    const result = require('child_process').execSync(
-      `node "${path.join(__dirname, 'skill-matcher.js')}" --rerank`,
-      { encoding: 'utf8', timeout: 5000 }
-    );
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --rerank`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stderr;
+    }
     const parsed = JSON.parse(result.trim());
     assert.ok(parsed.error);
   });
@@ -789,10 +794,15 @@ description: A skill for debugging code
   });
 
   it('--multi with no task prints error', () => {
-    const result = require('child_process').execSync(
-      `node "${path.join(__dirname, 'skill-matcher.js')}" --multi`,
-      { encoding: 'utf8', timeout: 5000 }
-    );
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --multi`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stderr;
+    }
     const parsed = JSON.parse(result.trim());
     assert.ok(parsed.error);
   });
@@ -822,7 +832,7 @@ description: A skill for debugging code
         { encoding: 'utf8', timeout: 5000 }
       );
     } catch (e) {
-      result = e.stdout;
+      result = e.stderr;
     }
     const parsed = JSON.parse(result.trim());
     assert.ok(parsed.error);
@@ -877,7 +887,7 @@ description: A valid skill for testing
         { encoding: 'utf8', timeout: 5000 }
       );
     } catch (e) {
-      result = e.stdout;
+      result = e.stderr;
     }
     const parsed = JSON.parse(result.trim());
     assert.strictEqual(parsed.valid, false);
@@ -898,17 +908,44 @@ description: missing name field
         { encoding: 'utf8', timeout: 5000 }
       );
     } catch (e) {
-      result = e.stdout;
+      result = e.stderr;
     }
     const parsed = JSON.parse(result.trim());
     assert.strictEqual(parsed.valid, false);
   });
 
+  it('reports invalid for name with special characters', () => {
+    const badDir = path.join(sandbox, 'bad-char-skill');
+    fs.mkdirSync(badDir, { recursive: true });
+    fs.writeFileSync(path.join(badDir, 'SKILL.md'), `---
+name: my skill!!!
+description: test
+---
+`);
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --validate "${path.join(badDir, 'SKILL.md')}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stderr;
+    }
+    const parsed = JSON.parse(result.trim());
+    assert.strictEqual(parsed.valid, false);
+    assert.ok(parsed.issues.some(i => i.includes('Invalid name')));
+  });
+
   it('prints error when no path given', () => {
-    const result = require('child_process').execSync(
-      `node "${path.join(__dirname, 'skill-matcher.js')}" --validate`,
-      { encoding: 'utf8', timeout: 5000 }
-    );
+    let result;
+    try {
+      result = require('child_process').execSync(
+        `node "${path.join(__dirname, 'skill-matcher.js')}" --validate`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+    } catch (e) {
+      result = e.stderr;
+    }
     const parsed = JSON.parse(result.trim());
     assert.ok(parsed.error);
   });
@@ -1240,7 +1277,7 @@ describe('semantic-scorer', () => {
 });
 
 describe('scanner uncovered paths', () => {
-  const { extractSkillsFromData, buildSkillHash, loadSkills, walkForSubdir, getDefaultScanDirs, buildSkillIndex, detectProjectContext } = require('../src/scanner');
+  const { extractSkillsFromData, loadSkills, walkForSubdir, getDefaultScanDirs, buildSkillIndex, detectProjectContext } = require('../src/scanner');
   const os = require('os');
   const scratchDir = path.join(process.cwd(), '.code-review-cache');
 
@@ -1418,15 +1455,17 @@ describe('scanner uncovered paths', () => {
     });
   });
 
-  describe('buildSkillHash', () => {
-    it('returns 16-char hash for existing file', () => {
-      const hash = buildSkillHash(path.join(process.cwd(), 'SKILL.md'));
+  describe('computeSkillHash (replaces buildSkillHash)', () => {
+    const { computeSkillHash } = require('../src/index');
+
+    it('returns hex hash for existing file', () => {
+      const hash = computeSkillHash(path.join(process.cwd(), 'SKILL.md'));
       assert.strictEqual(typeof hash, 'string');
-      assert.strictEqual(hash.length, 16);
+      assert.ok(hash.length >= 16);
     });
 
     it('returns null for missing file', () => {
-      assert.strictEqual(buildSkillHash('/nonexistent/SKILL.md'), null);
+      assert.strictEqual(computeSkillHash('/nonexistent/file.md'), null);
     });
   });
 

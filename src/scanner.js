@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const { logger } = require('./logger');
 
@@ -317,21 +318,6 @@ function detectProjectContext(projectDir) {
 }
 
 /**
- * Build a skill hash to detect changes for embedding cache invalidation.
- * @param {string} skillPath — path to SKILL.md
- * @returns {string|null}
- */
-function buildSkillHash(skillPath) {
-  try {
-    const content = fs.readFileSync(skillPath, 'utf8');
-    const crypto = require('crypto');
-    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Scan skill directories and write a lightweight skills index with paths.
  * When computeEmbeddings is provided, also computes embeddings for semantic scoring.
  * @param {string} [outputPath] — path for .skills-index.json (default: cwd/.skills-index.json)
@@ -364,7 +350,7 @@ async function buildSkillIndex(outputPath, scanDirs, projectContext, computeEmbe
       const parsed = parseSkillFrontmatter(content);
       if (parsed && !seen.has(parsed.name)) {
         seen.add(parsed.name);
-        const indexEntry = { name: parsed.name, description: parsed.description, path: skillPath, hash: buildSkillHash(skillPath) };
+        const indexEntry = { name: parsed.name, description: parsed.description, path: skillPath, hash: crypto.createHash('sha256').update(content).digest('hex').slice(0, 16) };
         if (typeof computeEmbeddings === 'function') {
           try {
             indexEntry.embedding = await computeEmbeddings(parsed.description);
@@ -390,5 +376,5 @@ module.exports = {
   isValidSkillsArray, extractSkillsFromData, isPathAllowed,
   loadSkills, parseSkillFrontmatter, walkForSubdir,
   getDefaultScanDirs, scanDirForSkills, discoverSkills,
-  detectProjectContext, buildSkillIndex, buildSkillHash
+  detectProjectContext, buildSkillIndex
 };
