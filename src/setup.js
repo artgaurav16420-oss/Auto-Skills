@@ -15,7 +15,7 @@ const AGENTS_MD_CHECK = 'auto-skill-select';
 
 const OPENCODE_JSONC_SCHEMA = 'https://opencode.ai/config.json';
 const RECOMMENDED_INSTRUCTIONS = [
-  '~/.agents/skills/karpathy-guidelines/SKILL.md',
+  '~/.claude/skills/karpathy-guidelines/SKILL.md',
   '~/.agents/skills/caveman/SKILL.md',
   '~/.agents/skills/auto-skill-select/SKILL.md'
 ];

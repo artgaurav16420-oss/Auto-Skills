@@ -23,7 +23,7 @@ This workflow re-runs on **every task change** — not just session start. When 
 | Skill | Purpose | Source |
 |-------|---------|--------|
 | **Caveman** | Ultra-compressed communication, minimal tokens | `~/.agents/skills/caveman/SKILL.md` |
-| **Karpathy Guidelines** | Think before coding, simplicity first, surgical changes | `~/.agents/skills/karpathy-guidelines/SKILL.md` |
+| **Karpathy Guidelines** | Think before coding, simplicity first, surgical changes | `~/.claude/skills/karpathy-guidelines/SKILL.md` |
 | **Superpowers** | Skill-invocation discipline — always check skills before acting | Already in system prompt |
 
 **Task layer (matched per-request):**
